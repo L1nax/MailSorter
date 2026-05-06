@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import email
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from email import policy
@@ -115,13 +116,22 @@ class IMAPWorker:
 
     async def _run(self) -> None:
         while self.running:
-            try:
-                await self.process_once()
-            except Exception:
-                log.exception("IMAPWorker loop error")
             with Session(engine) as s:
-                interval = int(get_setting(s, "poll_interval_seconds"))
-            await asyncio.sleep(interval)
+                use_idle = get_setting(s, "use_idle") == "true"
+            if use_idle:
+                try:
+                    await asyncio.to_thread(self._run_idle_sync)
+                except Exception:
+                    log.exception("IDLE error, reconnecting in 30s")
+                    await asyncio.sleep(30)
+            else:
+                try:
+                    await self.process_once()
+                except Exception:
+                    log.exception("IMAPWorker loop error")
+                with Session(engine) as s:
+                    interval = int(get_setting(s, "poll_interval_seconds"))
+                await asyncio.sleep(interval)
 
     async def process_once(self) -> None:
         with Session(engine) as session:
@@ -155,26 +165,91 @@ class IMAPWorker:
         with IMAPClient(host, port=port, ssl=tls) as imap:
             imap.login(user, password)
             imap.select_folder(folder, readonly=False)
+            self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
 
-            uids = imap.search(["UNSEEN"])
-            if not uids:
-                return
-            log.info("Found %d unseen mails", len(uids))
+    def _process_imap_session(
+        self,
+        imap: IMAPClient,
+        folder: str, trash: str,
+        ai_enabled: bool, ai_key: str, ai_model: str, ai_prompt: str,
+    ) -> None:
+        """Verarbeitet alle UNSEEN-Mails auf einer bereits offenen, authentifizierten Verbindung."""
+        uids = imap.search(["UNSEEN"])
+        if not uids:
+            return
+        log.info("Found %d unseen mails", len(uids))
 
-            with Session(engine) as session:
-                rules = session.exec(select(Rule).where(Rule.enabled == True).order_by(Rule.priority)).all()
+        with Session(engine) as session:
+            rules = session.exec(select(Rule).where(Rule.enabled == True).order_by(Rule.priority)).all()
 
-            rule_engine = RuleEngine(list(rules))
-            executor = ActionExecutor(imap, trash_folder=trash)
+        rule_engine = RuleEngine(list(rules))
+        executor = ActionExecutor(imap, trash_folder=trash)
 
-            for uid in uids:
-                try:
-                    raw_data = imap.fetch([uid], ["RFC822"])
-                    raw_bytes = raw_data[uid][b"RFC822"]
-                    mail = _parse_mail(uid, raw_bytes)
-                    self._process_single(mail, rule_engine, executor, imap, ai_enabled, ai_key, ai_model, ai_prompt, folder)
-                except Exception:
-                    log.exception("Error processing UID %s", uid)
+        for uid in uids:
+            try:
+                raw_data = imap.fetch([uid], ["RFC822"])
+                raw_bytes = raw_data[uid][b"RFC822"]
+                mail = _parse_mail(uid, raw_bytes)
+                self._process_single(mail, rule_engine, executor, imap, ai_enabled, ai_key, ai_model, ai_prompt, folder)
+            except Exception:
+                log.exception("Error processing UID %s", uid)
+
+    def _run_idle_sync(self) -> None:
+        """Blockierender IDLE-Loop – läuft in einem Thread via asyncio.to_thread."""
+        # RFC 2177: Server dürfen IDLE nach 29 min beenden; wir erneuern nach 20 min.
+        IDLE_REFRESH_SECS = 20 * 60
+        IDLE_CHECK_SECS = 30  # Granularität, mit der self.running geprüft wird
+
+        with Session(engine) as s:
+            host = get_setting(s, "imap_host")
+            port = int(get_setting(s, "imap_port"))
+            user = get_setting(s, "imap_user")
+            password = get_setting(s, "imap_password")
+            tls = get_setting(s, "imap_tls") == "true"
+            folder = get_setting(s, "imap_folder")
+            trash = get_setting(s, "trash_folder")
+            ai_enabled = get_setting(s, "ai_enabled") == "true"
+            ai_key = get_setting(s, "ai_api_key")
+            ai_model = get_setting(s, "ai_model")
+            ai_prompt = get_setting(s, "ai_system_prompt")
+
+        if not host or not user or not password:
+            log.debug("IMAP not configured, skipping IDLE")
+            return
+
+        with IMAPClient(host, port=port, ssl=tls) as imap:
+            imap.login(user, password)
+            imap.select_folder(folder, readonly=False)
+
+            # Vorhandene ungelesene Mails vor IDLE-Eintritt verarbeiten
+            self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
+
+            log.info("IDLE mode: entering IDLE")
+            imap.idle()
+            idle_start = time.monotonic()
+
+            while self.running:
+                responses = imap.idle_check(timeout=IDLE_CHECK_SECS)
+                elapsed = time.monotonic() - idle_start
+
+                has_new = any(typ == b"EXISTS" for _, typ in (responses or []))
+
+                if has_new or elapsed >= IDLE_REFRESH_SECS:
+                    imap.idle_done()
+
+                    if has_new:
+                        log.info("IDLE: EXISTS-Benachrichtigung empfangen, verarbeite Mails")
+                        self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
+                    else:
+                        log.debug("IDLE: Verbindung nach %ds erneuert", IDLE_REFRESH_SECS)
+
+                    imap.idle()
+                    idle_start = time.monotonic()
+
+            try:
+                imap.idle_done()
+            except Exception:
+                pass
 
     def _process_single(
         self,
