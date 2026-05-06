@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import email
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -99,6 +100,7 @@ class IMAPWorker:
     def __init__(self) -> None:
         self.running = False
         self._task: asyncio.Task | None = None
+        self._process_event = threading.Event()
 
     def start(self) -> None:
         if self.running:
@@ -135,6 +137,7 @@ class IMAPWorker:
 
     async def process_once(self) -> None:
         with Session(engine) as session:
+            use_idle = get_setting(session, "use_idle") == "true"
             host = get_setting(session, "imap_host")
             port = int(get_setting(session, "imap_port"))
             user = get_setting(session, "imap_user")
@@ -146,6 +149,11 @@ class IMAPWorker:
             ai_key = get_setting(session, "ai_api_key")
             ai_model = get_setting(session, "ai_model")
             ai_prompt = get_setting(session, "ai_system_prompt")
+
+        if use_idle and self.running:
+            # IDLE-Loop läuft bereits – Verarbeitung über Event signalisieren
+            self._process_event.set()
+            return
 
         if not host or not user or not password:
             log.debug("IMAP not configured, skipping")
@@ -233,12 +241,14 @@ class IMAPWorker:
                 elapsed = time.monotonic() - idle_start
 
                 has_new = any(typ == b"EXISTS" for _, typ in (responses or []))
+                force = self._process_event.is_set()
 
-                if has_new or elapsed >= IDLE_REFRESH_SECS:
+                if has_new or elapsed >= IDLE_REFRESH_SECS or force:
                     imap.idle_done()
+                    self._process_event.clear()
 
-                    if has_new:
-                        log.info("IDLE: EXISTS-Benachrichtigung empfangen, verarbeite Mails")
+                    if has_new or force:
+                        log.info("IDLE: %s", "manuell ausgelöst" if force and not has_new else "EXISTS-Benachrichtigung, verarbeite Mails")
                         self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
                     else:
                         log.debug("IDLE: Verbindung nach %ds erneuert", IDLE_REFRESH_SECS)
@@ -273,10 +283,11 @@ class IMAPWorker:
         )
 
         matched_rule = rule_engine.evaluate(mail_data)
-        rule_id = None
-        rule_name = None
-        action_type = None
+        rule_id: str | None = None
+        rule_name: str | None = None
+        action_type: Any = None
         action_params: dict[str, Any] = {}
+        ai_warning = ""
 
         if matched_rule:
             rule_id = matched_rule.id
@@ -284,24 +295,31 @@ class IMAPWorker:
             action_type = matched_rule.action
             action_params = matched_rule.action_params or {}
         elif ai_enabled and ai_key:
-            # Run async AI in sync context via new event loop
             import asyncio as _asyncio
             with Session(engine) as s:
                 from sqlmodel import select as _select
                 target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
             classifier = AIClassifier(ai_key, ai_model, ai_prompt, target_folders)
-            result = _asyncio.run(classifier.classify(mail))
+            ai_result = _asyncio.run(classifier.classify(mail))
             rule_name = "AI"
-            action_type = result.action
-            action_params = result.params
+            action_type = ai_result.action
+            action_params = ai_result.params
+            ai_warning = ai_result.warning
 
         if action_type is None:
-            self._write_log(mail, rule_id, rule_name or "no match", "keep", inbox_folder, AuditStatus.success, "")
+            action_type = "keep"
+            rule_name = rule_name or "no match"
+
+        # Phase 1: Log-Eintrag schreiben, bevor die Aktion ausgeführt wird
+        log_id = self._create_log_entry(mail, rule_id, rule_name, str(action_type))
+
+        # Phase 2: Aktion ausführen
+        if str(action_type) == "keep":
             imap.set_flags(mail.uid, [b"\\Seen"])
+            self._finalize_log_entry(log_id, inbox_folder, AuditStatus.success, ai_warning)
             return
 
-        # Handle Paperless special case
-        if action_type == "paperless":
+        if str(action_type) == "paperless":
             from ..services.paperless import upload_pdf_sync
             with Session(engine) as s:
                 paperless_url = get_setting(s, "paperless_url")
@@ -310,32 +328,30 @@ class IMAPWorker:
                 if filename.lower().endswith(".pdf"):
                     ok, err = upload_pdf_sync(paperless_url, paperless_token, filename, data, mail)
                     if not ok:
-                        self._write_log(mail, rule_id, rule_name, action_type, filename, AuditStatus.error, err)
+                        self._finalize_log_entry(log_id, filename, AuditStatus.error, err)
                         return
 
-        # Handle Webhook
-        if action_type == "webhook":
+        if str(action_type) == "webhook":
             from ..services.webhook import fire_webhook_sync
             url = action_params.get("url", "")
             fire_webhook_sync(url, mail)
 
-        result = executor.execute(mail, action_type, action_params)
-        status = AuditStatus.success if result.success else AuditStatus.error
-        self._write_log(mail, rule_id, rule_name, str(action_type), result.target, status, result.error)
+        exec_result = executor.execute(mail, action_type, action_params)
+        status = AuditStatus.success if exec_result.success else AuditStatus.error
 
-        if result.success:
+        # Phase 3: Log-Eintrag finalisieren
+        self._finalize_log_entry(log_id, exec_result.target, status, exec_result.error or ai_warning)
+
+        if exec_result.success:
             imap.set_flags(mail.uid, [b"\\Seen"])
 
     @staticmethod
-    def _write_log(
+    def _create_log_entry(
         mail: RawMail,
         rule_id: str | None,
         rule_name: str | None,
         action: str,
-        target: str,
-        status: AuditStatus,
-        error_msg: str,
-    ) -> None:
+    ) -> str:
         with Session(engine) as s:
             entry = AuditLog(
                 timestamp=datetime.utcnow(),
@@ -345,9 +361,25 @@ class IMAPWorker:
                 rule_id=rule_id,
                 rule_name=rule_name,
                 action=action,
-                target=target,
-                status=status,
-                error_msg=error_msg or None,
+                status=AuditStatus.processing,
             )
             s.add(entry)
             s.commit()
+            s.refresh(entry)
+            return entry.id
+
+    @staticmethod
+    def _finalize_log_entry(
+        log_id: str,
+        target: str | None,
+        status: AuditStatus,
+        error_msg: str,
+    ) -> None:
+        with Session(engine) as s:
+            entry = s.get(AuditLog, log_id)
+            if entry:
+                entry.target = target or None
+                entry.status = status
+                entry.error_msg = error_msg or None
+                s.add(entry)
+                s.commit()
