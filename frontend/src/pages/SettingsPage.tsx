@@ -109,7 +109,13 @@ export default function SettingsPage() {
               <Input type="number" value={settings.poll_interval_seconds} onChange={e => update('poll_interval_seconds', Number(e.target.value))} className="w-32" />
             </div>
           )}
-          <TestButton label="IMAP testen" onTest={settingsApi.testImap} />
+          <TestButton label="IMAP testen" onTest={() => settingsApi.testImap({
+            imap_host: settings.imap_host,
+            imap_port: settings.imap_port,
+            imap_user: settings.imap_user,
+            imap_password: settings.imap_password,
+            imap_tls: settings.imap_tls,
+          })} />
         </CardContent>
       </Card>
 
