@@ -125,10 +125,20 @@ export const settingsApi = {
 }
 
 // Status
+export interface TopRule {
+  name: string
+  count: number
+}
+
 export interface Status {
   worker_running: boolean
+  idle_mode: boolean
+  imap_configured: boolean
+  paperless_configured: boolean
   mails_today: number
   mails_week: number
+  ai_count_week: number
+  top_rules: TopRule[]
   timestamp: string
 }
 
