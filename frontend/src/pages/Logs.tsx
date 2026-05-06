@@ -11,12 +11,12 @@ export default function Logs() {
   const [data, setData] = useState<LogsResponse | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState('all')
 
   const load = async () => {
     const params: Record<string, string | number> = { page, page_size: 50 }
     if (search) params.search = search
-    if (status) params.status = status
+    if (status && status !== 'all') params.status = status
     setData(await logsApi.list(params))
   }
 
@@ -40,7 +40,7 @@ export default function Logs() {
         <Select value={status} onValueChange={v => { setStatus(v); setPage(1) }}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Alle Status" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Alle Status</SelectItem>
+            <SelectItem value="all">Alle Status</SelectItem>
             <SelectItem value="success">Erfolg</SelectItem>
             <SelectItem value="error">Fehler</SelectItem>
           </SelectContent>
