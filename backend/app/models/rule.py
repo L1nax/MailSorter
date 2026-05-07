@@ -69,3 +69,5 @@ class RuleTestRequest(SQLModel):
     has_attachment: bool = False
     attachment_types: list[str] = Field(default_factory=list)
     body: str = ""
+    # Optional: Conditions der aktuell im Editor offenen Regel (noch nicht gespeichert)
+    conditions: list[dict[str, Any]] | None = None

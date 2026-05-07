@@ -6,6 +6,7 @@ from sqlmodel import SQLModel, Field
 
 
 class AuditStatus(str, Enum):
+    processing = "processing"
     success = "success"
     error = "error"
 

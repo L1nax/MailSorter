@@ -5,18 +5,22 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Download, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Download, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 
 export default function Logs() {
   const [data, setData] = useState<LogsResponse | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const load = async () => {
     const params: Record<string, string | number> = { page, page_size: 50 }
     if (search) params.search = search
-    if (status) params.status = status
+    if (status && status !== 'all') params.status = status
+    if (dateFrom) params.date_from = dateFrom + 'T00:00:00'
+    if (dateTo) params.date_to = dateTo + 'T23:59:59'
     setData(await logsApi.list(params))
   }
 
@@ -35,17 +39,36 @@ export default function Logs() {
         </a>
       </div>
 
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <Input placeholder="Suche (Absender, Betreff, Message-ID)" value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
-        <Select value={status} onValueChange={v => { setStatus(v); setPage(1) }}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Alle Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">Alle Status</SelectItem>
-            <SelectItem value="success">Erfolg</SelectItem>
-            <SelectItem value="error">Fehler</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button type="submit" variant="outline">Filtern</Button>
+      <form onSubmit={handleSearch} className="space-y-2">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Suche (Absender, Betreff, Message-ID)"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="flex-1"
+          />
+          <Select value={status} onValueChange={v => { setStatus(v); setPage(1) }}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Alle Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Status</SelectItem>
+              <SelectItem value="success">Erfolg</SelectItem>
+              <SelectItem value="error">Fehler</SelectItem>
+              <SelectItem value="processing">In Bearbeitung</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button type="submit" variant="outline">Filtern</Button>
+        </div>
+        <div className="flex gap-2 items-center text-sm">
+          <span className="text-muted-foreground whitespace-nowrap">Zeitraum:</span>
+          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40" />
+          <span className="text-muted-foreground">–</span>
+          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" />
+          {(dateFrom || dateTo) && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo('') }}>
+              Zurücksetzen
+            </Button>
+          )}
+        </div>
       </form>
 
       <Card>
@@ -78,7 +101,9 @@ export default function Logs() {
                   <td className="px-4 py-2">
                     {l.status === 'success'
                       ? <CheckCircle className="h-4 w-4 text-green-500" />
-                      : <AlertCircle className="h-4 w-4 text-red-500" />}
+                      : l.status === 'error'
+                        ? <AlertCircle className="h-4 w-4 text-red-500" />
+                        : <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />}
                   </td>
                 </tr>
               ))}
