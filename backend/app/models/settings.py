@@ -26,6 +26,8 @@ class SettingsRead(SQLModel):
         "Classify this email into one of the provided folders. "
         "Respond with only the folder name."
     )
+    ai_provider: str = "claude"
+    ai_base_url: str = ""
     audit_retention_days: int = 90
     api_key: str = ""  # optional UI protection, masked
 
@@ -46,5 +48,7 @@ class SettingsUpdate(SQLModel):
     ai_api_key: str | None = None
     ai_model: str | None = None
     ai_system_prompt: str | None = None
+    ai_provider: str | None = None
+    ai_base_url: str | None = None
     audit_retention_days: int | None = None
     api_key: str | None = None

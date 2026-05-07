@@ -21,6 +21,8 @@ DEFAULTS: dict[str, str] = {
         "Classify this email into one of the provided folders. "
         "Respond with only the folder name."
     ),
+    "ai_provider": "claude",
+    "ai_base_url": "",
     "audit_retention_days": "90",
     "api_key": "",
 }
@@ -65,6 +67,8 @@ def get_all_settings(session: Session) -> SettingsRead:
         ai_api_key="***" if g("ai_api_key") else "",
         ai_model=g("ai_model"),
         ai_system_prompt=g("ai_system_prompt"),
+        ai_provider=g("ai_provider"),
+        ai_base_url=g("ai_base_url"),
         audit_retention_days=int(g("audit_retention_days")),
         api_key="***" if g("api_key") else "",
     )

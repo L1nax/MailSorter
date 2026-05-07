@@ -22,6 +22,7 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "di
 async def lifespan(app: FastAPI):
     init_db()
     set_worker(worker)
+    worker.start()
     yield
     worker.stop()
 

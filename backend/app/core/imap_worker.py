@@ -16,7 +16,6 @@ from ..config import get_setting
 from ..models import Rule, AuditLog, AuditStatus
 from .rule_engine import RuleEngine, MailData
 from .action_executor import ActionExecutor
-from .ai_classifier import AIClassifier
 
 log = logging.getLogger(__name__)
 
@@ -107,7 +106,7 @@ class IMAPWorker:
         if self.running:
             return
         self.running = True
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         self._task = loop.create_task(self._run())
         log.info("IMAPWorker started")
 
@@ -194,10 +193,18 @@ class IMAPWorker:
         rule_engine = RuleEngine(list(rules))
         executor = ActionExecutor(imap, trash_folder=trash)
 
+        rule_folders = [
+            r.action_params.get("folder")
+            for r in rules
+            if r.action == "move" and r.action_params and r.action_params.get("folder")
+        ]
+        if rule_folders:
+            executor.subscribe_rule_folders(rule_folders)
+
         for uid in uids:
             try:
-                raw_data = imap.fetch([uid], ["RFC822"])
-                raw_bytes = raw_data[uid][b"RFC822"]
+                raw_data = imap.fetch([uid], ["BODY.PEEK[]"])
+                raw_bytes = raw_data[uid][b"BODY[]"]
                 mail = _parse_mail(uid, raw_bytes)
                 self._process_single(mail, rule_engine, executor, imap, ai_enabled, ai_key, ai_model, ai_prompt, folder)
             except Exception:
@@ -238,24 +245,49 @@ class IMAPWorker:
             idle_start = time.monotonic()
 
             while self.running:
-                responses = imap.idle_check(timeout=IDLE_CHECK_SECS)
-                elapsed = time.monotonic() - idle_start
+                try:
+                    responses = imap.idle_check(timeout=IDLE_CHECK_SECS)
+                except Exception:
+                    log.exception("IDLE: idle_check fehlgeschlagen, Verbindung wird neu aufgebaut")
+                    return
 
-                has_new = any(typ == b"EXISTS" for _, typ in (responses or []))
+                elapsed = time.monotonic() - idle_start
+                has_new = any(
+                    typ == b"EXISTS"
+                    for entry in (responses or [])
+                    for _, typ in [entry[:2]]
+                )
                 force = self._process_event.is_set()
 
+                log.debug("IDLE: check — responses=%s has_new=%s elapsed=%.0fs", responses, has_new, elapsed)
+
                 if has_new or elapsed >= IDLE_REFRESH_SECS or force:
-                    imap.idle_done()
+                    try:
+                        imap.idle_done()
+                    except Exception:
+                        log.exception("IDLE: idle_done fehlgeschlagen, Verbindung wird neu aufgebaut")
+                        return
+
                     self._process_event.clear()
 
                     if has_new or force:
                         log.info("IDLE: %s", "manuell ausgelöst" if force and not has_new else "EXISTS-Benachrichtigung, verarbeite Mails")
-                        self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
+                        try:
+                            imap.select_folder(folder, readonly=False)
+                            self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
+                        except Exception:
+                            log.exception("IDLE: Verarbeitung fehlgeschlagen, Verbindung wird neu aufgebaut")
+                            return
                     else:
-                        log.debug("IDLE: Verbindung nach %ds erneuert", IDLE_REFRESH_SECS)
+                        log.info("IDLE: Verbindung nach %.0fs erneuert", elapsed)
 
-                    imap.idle()
-                    idle_start = time.monotonic()
+                    try:
+                        imap.select_folder(folder, readonly=False)
+                        imap.idle()
+                        idle_start = time.monotonic()
+                    except Exception:
+                        log.exception("IDLE: Neustart des IDLE fehlgeschlagen, Verbindung wird neu aufgebaut")
+                        return
 
             try:
                 imap.idle_done()
@@ -295,13 +327,14 @@ class IMAPWorker:
             rule_name = matched_rule.name
             action_type = matched_rule.action
             action_params = matched_rule.action_params or {}
-        elif ai_enabled and ai_key:
+        elif ai_enabled:
             import asyncio as _asyncio
             with Session(engine) as s:
+                from .providers import get_provider as _get_provider
                 from sqlmodel import select as _select
+                _provider = _get_provider(s)
                 target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
-            classifier = AIClassifier(ai_key, ai_model, ai_prompt, target_folders)
-            ai_result = _asyncio.run(classifier.classify(mail))
+            ai_result = _asyncio.run(_provider.classify(mail, target_folders, ai_prompt))
             rule_name = "AI"
             action_type = ai_result.action
             action_params = ai_result.params
@@ -314,7 +347,7 @@ class IMAPWorker:
         # Phase 1: Log-Eintrag schreiben, bevor die Aktion ausgeführt wird
         log_id = self._create_log_entry(mail, rule_id, rule_name, str(action_type))
 
-        mark_as_read: bool = action_params.get("mark_as_read", True)
+        mark_as_read: bool = action_params.get("mark_as_read", False)
 
         # Phase 2: Aktion ausführen
         if str(action_type) == "keep":
