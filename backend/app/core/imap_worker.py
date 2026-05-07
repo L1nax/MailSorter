@@ -329,9 +329,17 @@ class IMAPWorker:
             import asyncio as _asyncio
             with Session(engine) as s:
                 from .providers import get_provider as _get_provider
-                from sqlmodel import select as _select
                 _provider = _get_provider(s)
-                target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
+                account_rules = s.exec(
+                    select(Rule)
+                    .where(Rule.enabled == True)
+                    .where(or_(Rule.account_id == None, Rule.account_id == self.account.id))
+                ).all()
+                target_folders = [
+                    r.action_params.get("folder", "")
+                    for r in account_rules
+                    if r.action_params and r.action_params.get("folder")
+                ]
             ai_result = _asyncio.run(_provider.classify(mail, target_folders, ai_prompt))
             rule_name = "AI"
             action_type = ai_result.action
