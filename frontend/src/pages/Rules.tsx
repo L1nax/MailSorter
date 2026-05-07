@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { rulesApi, type Rule, type RuleCreate, type Condition, type ActionType, type ConditionType } from '@/api/client'
+import { rulesApi, settingsApi, type Rule, type RuleCreate, type Condition, type ActionType, type ConditionType } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -72,7 +72,7 @@ function SortableRuleRow({ rule, onEdit, onDelete, onToggle }: { rule: Rule; onE
   )
 }
 
-function RuleEditor({ initial, onSave, onClose }: { initial: RuleCreate; onSave: (r: RuleCreate) => void; onClose: () => void }) {
+function RuleEditor({ initial, onSave, onClose, paperlessOk }: { initial: RuleCreate; onSave: (r: RuleCreate) => void; onClose: () => void; paperlessOk: boolean }) {
   const [form, setForm] = useState<RuleCreate>(initial)
   const [testInput, setTestInput] = useState({ from_address: '', subject: '', body: '' })
   const [testResult, setTestResult] = useState<string | null>(null)
@@ -88,6 +88,8 @@ function RuleEditor({ initial, onSave, onClose }: { initial: RuleCreate; onSave:
     const r = await rulesApi.test({ ...testInput, conditions: form.conditions }) as { matched: boolean; rule_name?: string; action?: string; action_params?: Record<string, string> }
     setTestResult(r.matched ? `Treffer: Bedingungen passen ✓` : 'Kein Treffer')
   }
+
+  const availableActions = ACTION_TYPES.filter(a => a.value !== 'paperless' || paperlessOk)
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -133,7 +135,7 @@ function RuleEditor({ initial, onSave, onClose }: { initial: RuleCreate; onSave:
               <Select value={form.action} onValueChange={v => setField('action', v as ActionType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {ACTION_TYPES.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                  {availableActions.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -193,6 +195,10 @@ function RuleEditor({ initial, onSave, onClose }: { initial: RuleCreate; onSave:
 export default function Rules() {
   const [rules, setRules] = useState<Rule[]>([])
   const [editing, setEditing] = useState<{ rule?: Rule; open: boolean }>({ open: false })
+  const [paperlessOk, setPaperlessOk] = useState(false)
+  useEffect(() => {
+    settingsApi.get().then(s => setPaperlessOk(!!(s.paperless_url && s.paperless_token)))
+  }, [])
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -288,6 +294,7 @@ export default function Rules() {
           } : BLANK_RULE}
           onSave={handleSave}
           onClose={() => setEditing({ open: false })}
+          paperlessOk={paperlessOk}
         />
       )}
     </div>
