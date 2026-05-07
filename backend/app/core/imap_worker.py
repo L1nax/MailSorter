@@ -181,7 +181,10 @@ class IMAPWorker:
         folder: str, trash: str,
         ai_enabled: bool, ai_key: str, ai_model: str, ai_prompt: str,
     ) -> None:
-        uids = imap.search(["UNSEEN"])
+        try:
+            uids = imap.search(["UNSEEN", "UNKEYWORD", "$MailSortProcessed"])
+        except Exception:
+            uids = imap.search(["UNSEEN"])
         if not uids:
             return
         log.info("Account '%s': %d ungelesene Mails gefunden", self.account.name, len(uids))
@@ -213,6 +216,11 @@ class IMAPWorker:
                 self._process_single(mail, rule_engine, executor, imap, ai_enabled, ai_key, ai_model, ai_prompt, folder)
             except Exception:
                 log.exception("Error processing UID %s on account '%s'", uid, self.account.name)
+            finally:
+                try:
+                    imap.add_flags([uid], [b"$MailSortProcessed"])
+                except Exception:
+                    pass
 
     def _run_idle_sync(self) -> None:
         IDLE_REFRESH_SECS = 20 * 60
