@@ -16,7 +16,6 @@ from ..config import get_setting
 from ..models import Rule, AuditLog, AuditStatus
 from .rule_engine import RuleEngine, MailData
 from .action_executor import ActionExecutor
-from .ai_classifier import AIClassifier
 
 log = logging.getLogger(__name__)
 
@@ -296,16 +295,19 @@ class IMAPWorker:
             action_type = matched_rule.action
             action_params = matched_rule.action_params or {}
         elif ai_enabled and ai_key:
-            import asyncio as _asyncio
-            with Session(engine) as s:
-                from sqlmodel import select as _select
-                target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
-            classifier = AIClassifier(ai_key, ai_model, ai_prompt, target_folders)
-            ai_result = _asyncio.run(classifier.classify(mail))
-            rule_name = "AI"
-            action_type = ai_result.action
-            action_params = ai_result.params
-            ai_warning = ai_result.warning
+            # TODO (Task 8): Ersetze mit neuem Provider-System
+            # import asyncio as _asyncio
+            # with Session(engine) as s:
+            #     from sqlmodel import select as _select
+            #     target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
+            # from .providers import make_provider
+            # provider = make_provider("claude", ai_key, ai_model, ai_prompt)
+            # ai_result = _asyncio.run(provider.classify(mail, target_folders, ai_prompt))
+            # rule_name = "AI"
+            # action_type = ai_result.action
+            # action_params = ai_result.params
+            # ai_warning = ai_result.warning
+            pass
 
         if action_type is None:
             action_type = "keep"
