@@ -367,11 +367,28 @@ class IMAPWorker:
                 "kein weiterer Text, keine Erklärung:\n"
                 + "\n".join(f"  {a}" for a in format_lines)
             )
+            effective_prompt += (
+                "\n\nOptional: Füge nach der Aktionszeile eine zweite Zeile mit dem "
+                "ausschlaggebenden Signal hinzu:\n"
+                "signals: <typ>:<wert>\n"
+                "Erlaubte Typen: from_domain, from_address, subject_contains, "
+                "has_attachment, attachment_type, to_address"
+            )
             ai_result = _asyncio.run(_provider.classify(mail, target_folders, effective_prompt))
             rule_name = "AI"
             action_type = ai_result.action
             action_params = ai_result.params
             ai_warning = ai_result.warning
+            if ai_result.signals:
+                from .suggestion_service import process_signals as _track_signals
+                with Session(engine) as _s:
+                    _track_signals(
+                        ai_result.signals,
+                        str(action_type),
+                        action_params.get("folder", ""),
+                        self.account.id,
+                        _s,
+                    )
 
         if action_type is None:
             action_type = "keep"
