@@ -19,6 +19,11 @@ class ImapTestRequest(BaseModel):
     imap_tls: bool = True
 
 
+class AiTestRequest(BaseModel):
+    ai_api_key: str = ""
+    ai_model: str = ""
+
+
 @router.get("", response_model=SettingsRead)
 def read_settings(session: Session = Depends(get_session)):
     return get_all_settings(session)
@@ -64,9 +69,13 @@ async def test_paperless(session: Session = Depends(get_session)):
 
 
 @router.post("/test-ai")
-async def test_ai(session: Session = Depends(get_session)):
+async def test_ai(body: AiTestRequest, session: Session = Depends(get_session)):
     from ..core.ai_classifier import test_ai_connection
-    api_key = get_setting(session, "ai_api_key")
-    model = get_setting(session, "ai_model")
+    api_key = (
+        get_setting(session, "ai_api_key")
+        if body.ai_api_key in (_SENTINEL, "")
+        else body.ai_api_key
+    )
+    model = body.ai_model or get_setting(session, "ai_model")
     ok, msg = await test_ai_connection(api_key, model)
     return {"ok": ok, "message": msg}

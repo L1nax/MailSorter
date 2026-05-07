@@ -159,7 +159,10 @@ export default function SettingsPage() {
                   onChange={e => update('ai_system_prompt', e.target.value)}
                 />
               </div>
-              <TestButton label="API-Key prüfen" onTest={settingsApi.testAi} />
+              <TestButton label="API-Key prüfen" onTest={() => settingsApi.testAi({
+                ai_api_key: settings.ai_api_key,
+                ai_model: settings.ai_model,
+              })} />
             </>
           )}
         </CardContent>
