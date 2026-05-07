@@ -20,8 +20,10 @@ class ImapTestRequest(BaseModel):
 
 
 class AiTestRequest(BaseModel):
+    ai_provider: str = "claude"
     ai_api_key: str = ""
     ai_model: str = ""
+    ai_base_url: str = ""
 
 
 class PaperlessTestRequest(BaseModel):
@@ -79,12 +81,15 @@ async def test_paperless(body: PaperlessTestRequest, session: Session = Depends(
 
 @router.post("/test-ai")
 async def test_ai(body: AiTestRequest, session: Session = Depends(get_session)):
-    from ..core.ai_classifier import test_ai_connection
+    from ..core.providers import make_provider
     api_key = (
         get_setting(session, "ai_api_key")
         if body.ai_api_key in (_SENTINEL, "")
         else body.ai_api_key
     )
     model = body.ai_model or get_setting(session, "ai_model")
-    ok, msg = await test_ai_connection(api_key, model)
+    provider_name = body.ai_provider or get_setting(session, "ai_provider") or "claude"
+    base_url = body.ai_base_url or get_setting(session, "ai_base_url")
+    provider = make_provider(provider_name, api_key, model, base_url)
+    ok, msg = await provider.test_connection()
     return {"ok": ok, "message": msg}
