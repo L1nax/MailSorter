@@ -9,7 +9,7 @@ import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 type TestState = { loading: boolean; ok?: boolean; message?: string }
 
-function TestButton({ label, onTest }: { label: string; onTest: () => Promise<{ ok: boolean; message: string }> }) {
+function TestButton({ onTest }: { label?: string; onTest: () => Promise<{ ok: boolean; message: string }> }) {
   const [state, setState] = useState<TestState>({ loading: false })
   const run = async () => {
     setState({ loading: true })

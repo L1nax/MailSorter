@@ -157,7 +157,7 @@ export default function Dashboard() {
                     {l.status === 'success'
                       ? <CheckCircle className="h-4 w-4 text-green-500" />
                       : l.status === 'error'
-                        ? <AlertCircle className="h-4 w-4 text-red-500" title={l.error_msg ?? ''} />
+                        ? <span title={l.error_msg ?? ''}><AlertCircle className="h-4 w-4 text-red-500" /></span>
                         : <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />}
                   </td>
                 </tr>

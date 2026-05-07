@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Trash2, GripVertical, Edit2, X, ChevronDown, ChevronUp, FlaskConical, MailOpen, Mail } from 'lucide-react'
 
@@ -58,8 +58,8 @@ function SortableRuleRow({ rule, onEdit, onDelete, onToggle }: { rule: Rule; onE
       <td className="px-3 py-3 text-sm text-muted-foreground truncate max-w-[120px]">{rule.action_params?.folder ?? rule.action_params?.url ?? ''}</td>
       <td className="px-3 py-3">
         {rule.action_params?.mark_as_read !== false
-          ? <MailOpen className="h-4 w-4 text-muted-foreground" title="Als gelesen markieren" />
-          : <Mail className="h-4 w-4 text-muted-foreground" title="Ungelesen lassen" />}
+          ? <span title="Als gelesen markieren"><MailOpen className="h-4 w-4 text-muted-foreground" /></span>
+          : <span title="Ungelesen lassen"><Mail className="h-4 w-4 text-muted-foreground" /></span>}
       </td>
       <td className="px-3 py-3"><Switch checked={rule.enabled} onCheckedChange={onToggle} /></td>
       <td className="px-3 py-3">
@@ -140,19 +140,19 @@ function RuleEditor({ initial, onSave, onClose }: { initial: RuleCreate; onSave:
             {(form.action === 'move' || form.action === 'paperless') && (
               <div className="space-y-1">
                 <Label>Zielordner</Label>
-                <Input value={form.action_params.folder ?? ''} onChange={e => setField('action_params', { ...form.action_params, folder: e.target.value })} placeholder="INBOX.Ordner" />
+                <Input value={String(form.action_params.folder ?? '')} onChange={e => setField('action_params', { ...form.action_params, folder: e.target.value })} placeholder="INBOX.Ordner" />
               </div>
             )}
             {form.action === 'webhook' && (
               <div className="space-y-1">
                 <Label>URL</Label>
-                <Input value={form.action_params.url ?? ''} onChange={e => setField('action_params', { ...form.action_params, url: e.target.value })} placeholder="https://..." />
+                <Input value={String(form.action_params.url ?? '')} onChange={e => setField('action_params', { ...form.action_params, url: e.target.value })} placeholder="https://..." />
               </div>
             )}
             {form.action === 'label' && (
               <div className="space-y-1">
                 <Label>Label</Label>
-                <Input value={form.action_params.label ?? ''} onChange={e => setField('action_params', { ...form.action_params, label: e.target.value })} placeholder="Label-Name" />
+                <Input value={String(form.action_params.label ?? '')} onChange={e => setField('action_params', { ...form.action_params, label: e.target.value })} placeholder="Label-Name" />
               </div>
             )}
           </div>
