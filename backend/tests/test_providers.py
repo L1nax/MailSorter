@@ -31,3 +31,58 @@ def test_build_prompt_contains_mail_fields():
     assert "a@b.com" in prompt
     assert "Rechnung" in prompt
     assert "INBOX.Rechnungen" in prompt
+
+
+import anthropic
+from unittest.mock import MagicMock, patch
+from app.core.providers.claude import ClaudeProvider
+from app.core.imap_worker import RawMail
+
+
+def _mail(subject="Test", body="Hello"):
+    return RawMail(uid=1, message_id="<t>", from_address="a@b.com",
+                   subject=subject, to_address="me@c.com", body=body,
+                   has_attachment=False, attachment_types=[])
+
+
+class TestClaudeProvider:
+    def test_known_folder(self):
+        provider = ClaudeProvider(api_key="key", model="claude-sonnet-4-6")
+        mock_resp = MagicMock()
+        mock_resp.content = [MagicMock(text="INBOX.Work")]
+
+        with patch.object(provider.client.messages, "create", return_value=mock_resp):
+            result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+
+        assert result.action == ActionType.move
+        assert result.params["folder"] == "INBOX.Work"
+        assert result.warning == ""
+
+    def test_unknown_folder_keeps(self):
+        provider = ClaudeProvider(api_key="key", model="claude-sonnet-4-6")
+        mock_resp = MagicMock()
+        mock_resp.content = [MagicMock(text="INBOX.Unknown")]
+
+        with patch.object(provider.client.messages, "create", return_value=mock_resp):
+            result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+
+        assert result.action == ActionType.keep
+        assert "INBOX.Unknown" in result.warning
+
+    def test_no_api_key_returns_keep(self):
+        provider = ClaudeProvider(api_key="", model="claude-sonnet-4-6")
+        result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+        assert result.action == ActionType.keep
+        assert "not configured" in result.warning
+
+    def test_rate_limit_retries(self):
+        provider = ClaudeProvider(api_key="key", model="claude-sonnet-4-6")
+        from unittest.mock import AsyncMock
+        with patch.object(
+            provider.client.messages, "create",
+            side_effect=anthropic.RateLimitError.__new__(anthropic.RateLimitError),
+        ):
+            with patch("asyncio.sleep", new_callable=AsyncMock):
+                result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+        assert result.action == ActionType.keep
+        assert result.warning != ""
