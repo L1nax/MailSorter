@@ -24,6 +24,11 @@ class AiTestRequest(BaseModel):
     ai_model: str = ""
 
 
+class PaperlessTestRequest(BaseModel):
+    paperless_url: str = ""
+    paperless_token: str = ""
+
+
 @router.get("", response_model=SettingsRead)
 def read_settings(session: Session = Depends(get_session)):
     return get_all_settings(session)
@@ -60,10 +65,14 @@ async def test_imap(body: ImapTestRequest, session: Session = Depends(get_sessio
 
 
 @router.post("/test-paperless")
-async def test_paperless(session: Session = Depends(get_session)):
+async def test_paperless(body: PaperlessTestRequest, session: Session = Depends(get_session)):
     from ..services.paperless import test_paperless_connection
-    url = get_setting(session, "paperless_url")
-    token = get_setting(session, "paperless_token")
+    url = body.paperless_url or get_setting(session, "paperless_url")
+    token = (
+        get_setting(session, "paperless_token")
+        if body.paperless_token in (_SENTINEL, "")
+        else body.paperless_token
+    )
     ok, msg = await test_paperless_connection(url, token)
     return {"ok": ok, "message": msg}
 

@@ -130,7 +130,10 @@ export default function SettingsPage() {
             <Label>API-Token</Label>
             <Input type="password" value={settings.paperless_token === '***' ? '' : settings.paperless_token} onChange={e => update('paperless_token', e.target.value)} placeholder="••••••••" />
           </div>
-          <TestButton label="Paperless testen" onTest={settingsApi.testPaperless} />
+          <TestButton label="Paperless testen" onTest={() => settingsApi.testPaperless({
+            paperless_url: settings.paperless_url,
+            paperless_token: settings.paperless_token,
+          })} />
         </CardContent>
       </Card>
 
