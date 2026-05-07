@@ -219,3 +219,35 @@ export const suggestionsApi = {
   dismiss: (id: string) =>
     request<RuleSuggestion>(`/suggestions/${id}/dismiss`, { method: 'POST' }),
 }
+
+// Backup
+export const backupApi = {
+  export: async (sections?: string[]): Promise<void> => {
+    const qs = sections && sections.length > 0 ? `?sections=${sections.join(',')}` : ''
+    const apiKey = localStorage.getItem('mailsort_api_key') ?? ''
+    const res = await fetch(`/api/backup/export${qs}`, {
+      headers: apiKey ? { 'X-API-Key': apiKey } : {},
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`${res.status}: ${text}`)
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get('Content-Disposition') ?? ''
+    const match = disposition.match(/filename="([^"]+)"/)
+    const filename = match?.[1] ?? `mailsort-backup-${new Date().toISOString().slice(0, 10)}.json`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  },
+  import: (data: object, mode: 'merge' | 'replace') =>
+    request<Record<string, number>>('/backup/import', {
+      method: 'POST',
+      body: JSON.stringify({ mode, data }),
+    }),
+}
