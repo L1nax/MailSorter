@@ -109,7 +109,13 @@ export default function SettingsPage() {
               <Input type="number" value={settings.poll_interval_seconds} onChange={e => update('poll_interval_seconds', Number(e.target.value))} className="w-32" />
             </div>
           )}
-          <TestButton onTest={settingsApi.testImap} />
+          <TestButton label="IMAP testen" onTest={() => settingsApi.testImap({
+            imap_host: settings.imap_host,
+            imap_port: settings.imap_port,
+            imap_user: settings.imap_user,
+            imap_password: settings.imap_password,
+            imap_tls: settings.imap_tls,
+          })} />
         </CardContent>
       </Card>
 
@@ -124,7 +130,10 @@ export default function SettingsPage() {
             <Label>API-Token</Label>
             <Input type="password" value={settings.paperless_token === '***' ? '' : settings.paperless_token} onChange={e => update('paperless_token', e.target.value)} placeholder="••••••••" />
           </div>
-          <TestButton onTest={settingsApi.testPaperless} />
+          <TestButton label="Paperless testen" onTest={() => settingsApi.testPaperless({
+            paperless_url: settings.paperless_url,
+            paperless_token: settings.paperless_token,
+          })} />
         </CardContent>
       </Card>
 
@@ -153,7 +162,10 @@ export default function SettingsPage() {
                   onChange={e => update('ai_system_prompt', e.target.value)}
                 />
               </div>
-              <TestButton onTest={settingsApi.testAi} />
+              <TestButton label="API-Key prüfen" onTest={() => settingsApi.testAi({
+                ai_api_key: settings.ai_api_key,
+                ai_model: settings.ai_model,
+              })} />
             </>
           )}
         </CardContent>

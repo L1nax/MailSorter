@@ -34,7 +34,7 @@ export interface Rule {
   enabled: boolean
   conditions: Condition[]
   action: ActionType
-  action_params: Record<string, string>
+  action_params: Record<string, string | boolean>
   created_at: string
 }
 
@@ -44,7 +44,7 @@ export interface RuleCreate {
   enabled: boolean
   conditions: Condition[]
   action: ActionType
-  action_params: Record<string, string>
+  action_params: Record<string, string | boolean>
 }
 
 export const rulesApi = {
@@ -108,19 +108,37 @@ export interface Settings {
   api_key: string
 }
 
+export interface ImapTestParams {
+  imap_host: string
+  imap_port: number
+  imap_user: string
+  imap_password: string
+  imap_tls: boolean
+}
+
 export const settingsApi = {
   get: () => request<Settings>('/settings'),
   update: (data: Partial<Settings>) => request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
-  testImap: () => request<{ ok: boolean; message: string }>('/settings/test-imap', { method: 'POST' }),
-  testPaperless: () => request<{ ok: boolean; message: string }>('/settings/test-paperless', { method: 'POST' }),
-  testAi: () => request<{ ok: boolean; message: string }>('/settings/test-ai', { method: 'POST' }),
+  testImap: (params: ImapTestParams) => request<{ ok: boolean; message: string }>('/settings/test-imap', { method: 'POST', body: JSON.stringify(params) }),
+  testPaperless: (params: { paperless_url: string; paperless_token: string }) => request<{ ok: boolean; message: string }>('/settings/test-paperless', { method: 'POST', body: JSON.stringify(params) }),
+  testAi: (params: { ai_api_key: string; ai_model: string }) => request<{ ok: boolean; message: string }>('/settings/test-ai', { method: 'POST', body: JSON.stringify(params) }),
 }
 
 // Status
+export interface TopRule {
+  name: string
+  count: number
+}
+
 export interface Status {
   worker_running: boolean
+  idle_mode: boolean
+  imap_configured: boolean
+  paperless_configured: boolean
   mails_today: number
   mails_week: number
+  ai_count_week: number
+  top_rules: TopRule[]
   timestamp: string
 }
 
