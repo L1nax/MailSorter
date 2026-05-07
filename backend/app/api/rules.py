@@ -59,7 +59,6 @@ def reorder_rules(body: RuleReorder, session: Session = Depends(get_session)):
 
 @router.post("/test")
 def test_rule(body: RuleTestRequest, session: Session = Depends(get_session)):
-    rules = session.exec(select(Rule).where(Rule.enabled == True).order_by(Rule.priority)).all()
     mail = MailData(
         from_address=body.from_address,
         subject=body.subject,
@@ -68,7 +67,25 @@ def test_rule(body: RuleTestRequest, session: Session = Depends(get_session)):
         attachment_types=body.attachment_types,
         body=body.body,
     )
-    engine = RuleEngine(rules)
+
+    # Wenn Conditions aus dem Editor mitgeschickt wurden, diese direkt testen
+    if body.conditions is not None:
+        from ..core.rule_engine import RuleEngine
+        tmp_rule = Rule(
+            id="preview",
+            name="Vorschau",
+            priority=0,
+            enabled=True,
+            conditions=body.conditions,
+            action="keep",
+            action_params={},
+        )
+        engine = RuleEngine([tmp_rule])
+        matched = engine.evaluate(mail)
+        return {"matched": bool(matched), "rule_name": "Aktuelle Regel" if matched else None}
+
+    rules = session.exec(select(Rule).where(Rule.enabled == True).order_by(Rule.priority)).all()
+    engine = RuleEngine(list(rules))
     matched = engine.evaluate(mail)
     if matched:
         return {"matched": True, "rule_id": matched.id, "rule_name": matched.name, "action": matched.action, "action_params": matched.action_params}

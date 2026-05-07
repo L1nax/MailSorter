@@ -80,8 +80,8 @@ function RuleEditor({ initial, onSave, onClose }: { initial: RuleCreate; onSave:
   const updateCondition = (i: number, c: Condition) => setField('conditions', form.conditions.map((x, j) => j === i ? c : x))
 
   const runTest = async () => {
-    const r = await rulesApi.test(testInput) as { matched: boolean; rule_name?: string; action?: string; action_params?: Record<string, string> }
-    setTestResult(r.matched ? `Treffer: ${r.rule_name} → ${r.action} ${JSON.stringify(r.action_params)}` : 'Kein Treffer')
+    const r = await rulesApi.test({ ...testInput, conditions: form.conditions }) as { matched: boolean; rule_name?: string; action?: string; action_params?: Record<string, string> }
+    setTestResult(r.matched ? `Treffer: Bedingungen passen ✓` : 'Kein Treffer')
   }
 
   return (
