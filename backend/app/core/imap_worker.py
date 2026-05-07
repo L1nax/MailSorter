@@ -97,6 +97,10 @@ def test_imap_connection(host: str, port: int, user: str, password: str, tls: bo
         msg = exc.args[0] if exc.args else exc
         if isinstance(msg, bytes):
             msg = msg.decode('utf-8', errors='replace')
+        else:
+            msg = str(msg)
+            if len(msg) > 3 and msg[0] == 'b' and msg[1] in ('"', "'") and msg[-1] == msg[1]:
+                msg = msg[2:-1]
         return False, str(msg)
 
 
