@@ -294,20 +294,18 @@ class IMAPWorker:
             rule_name = matched_rule.name
             action_type = matched_rule.action
             action_params = matched_rule.action_params or {}
-        elif ai_enabled and ai_key:
-            # TODO (Task 8): Ersetze mit neuem Provider-System
-            # import asyncio as _asyncio
-            # with Session(engine) as s:
-            #     from sqlmodel import select as _select
-            #     target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
-            # from .providers import make_provider
-            # provider = make_provider("claude", ai_key, ai_model, ai_prompt)
-            # ai_result = _asyncio.run(provider.classify(mail, target_folders, ai_prompt))
-            # rule_name = "AI"
-            # action_type = ai_result.action
-            # action_params = ai_result.params
-            # ai_warning = ai_result.warning
-            pass
+        elif ai_enabled:
+            import asyncio as _asyncio
+            with Session(engine) as s:
+                from .providers import get_provider as _get_provider
+                from sqlmodel import select as _select
+                _provider = _get_provider(s)
+                target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
+            ai_result = _asyncio.run(_provider.classify(mail, target_folders, ai_prompt))
+            rule_name = "AI"
+            action_type = ai_result.action
+            action_params = ai_result.params
+            ai_warning = ai_result.warning
 
         if action_type is None:
             action_type = "keep"
