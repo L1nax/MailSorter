@@ -103,6 +103,8 @@ export interface Settings {
   ai_base_url: string
   audit_retention_days: number
   api_key: string
+  suggestion_threshold: number
+  suggestion_snooze_days: number
 }
 
 export const settingsApi = {
@@ -182,4 +184,38 @@ export const statusApi = {
   start: () => request<void>('/worker/start', { method: 'POST' }),
   stop: () => request<void>('/worker/stop', { method: 'POST' }),
   processNow: () => request<void>('/worker/process-now', { method: 'POST' }),
+}
+
+// Suggestions
+export type SuggestionStatus = 'pending' | 'accepted' | 'snoozed' | 'dismissed'
+
+export interface RuleSuggestion {
+  id: string
+  signal_type: string
+  signal_value: string
+  action: string
+  target: string
+  suggested_conditions: Condition[]
+  suggested_rule_name: string
+  status: SuggestionStatus
+  snooze_until: string | null
+  created_at: string
+  account_id: string | null
+}
+
+export const suggestionsApi = {
+  list: (status?: string) => {
+    const qs = status ? `?status=${status}` : ''
+    return request<RuleSuggestion[]>(`/suggestions${qs}`)
+  },
+  count: () => request<{ count: number }>('/suggestions/count'),
+  accept: (id: string) =>
+    request<RuleSuggestion>(`/suggestions/${id}/accept`, { method: 'POST' }),
+  snooze: (id: string, days: number) =>
+    request<RuleSuggestion>(`/suggestions/${id}/snooze`, {
+      method: 'POST',
+      body: JSON.stringify({ days }),
+    }),
+  dismiss: (id: string) =>
+    request<RuleSuggestion>(`/suggestions/${id}/dismiss`, { method: 'POST' }),
 }
