@@ -94,7 +94,10 @@ def test_imap_connection(host: str, port: int, user: str, password: str, tls: bo
             imap.login(user, password)
         return True, "Connection successful"
     except Exception as exc:
-        return False, str(exc)
+        msg = exc.args[0] if exc.args else exc
+        if isinstance(msg, bytes):
+            msg = msg.decode('utf-8', errors='replace')
+        return False, str(msg)
 
 
 class IMAPWorker:
