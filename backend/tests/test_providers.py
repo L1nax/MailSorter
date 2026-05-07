@@ -131,3 +131,29 @@ class TestOpenAIProvider:
         result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
         assert result.action == ActionType.keep
         assert "not configured" in result.warning
+
+
+from unittest.mock import MagicMock, patch
+from app.core.providers.gemini import GeminiProvider
+
+
+class TestGeminiProvider:
+    def test_known_folder(self):
+        provider = GeminiProvider(api_key="key", model="gemini-2.0-flash")
+        mock_resp = MagicMock()
+        mock_resp.text = "INBOX.Work"
+
+        with patch("google.generativeai.GenerativeModel") as MockModel:
+            MockModel.return_value.generate_content.return_value = mock_resp
+            with patch("google.generativeai.configure"):
+                provider._model = MockModel.return_value
+                result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+
+        assert result.action == ActionType.move
+        assert result.params["folder"] == "INBOX.Work"
+
+    def test_no_api_key_returns_keep(self):
+        provider = GeminiProvider(api_key="", model="gemini-2.0-flash")
+        result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+        assert result.action == ActionType.keep
+        assert "not configured" in result.warning
