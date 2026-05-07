@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { statusApi, logsApi, type Status, type AuditLog } from '@/api/client'
+import { statusApi, logsApi, accountsApi, type Status, type AuditLog } from '@/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [status, setStatus] = useState<Status | null>(null)
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(false)
+  const [multiAccount, setMultiAccount] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const refresh = async () => {
@@ -27,6 +28,10 @@ export default function Dashboard() {
     setStatus(s)
     setLogs(l.items)
   }
+
+  useEffect(() => {
+    accountsApi.list().then(a => setMultiAccount(a.length > 1))
+  }, [])
 
   useEffect(() => {
     refresh()
@@ -138,6 +143,7 @@ export default function Dashboard() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-2 text-left font-medium">Zeit</th>
+                {multiAccount && <th className="px-4 py-2 text-left font-medium">Account</th>}
                 <th className="px-4 py-2 text-left font-medium">Von</th>
                 <th className="px-4 py-2 text-left font-medium">Betreff</th>
                 <th className="px-4 py-2 text-left font-medium">Regel</th>
@@ -147,10 +153,11 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {logs.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Keine Einträge</td></tr>
+                <tr><td colSpan={multiAccount ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">Keine Einträge</td></tr>
               ) : logs.map(l => (
                 <tr key={l.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="px-4 py-2 whitespace-nowrap text-muted-foreground">{new Date(l.timestamp).toLocaleTimeString('de')}</td>
+                  {multiAccount && <td className="px-4 py-2 max-w-[120px] truncate text-muted-foreground">{l.account_name ?? '–'}</td>}
                   <td className="px-4 py-2 max-w-[160px] truncate">{l.from_address}</td>
                   <td className="px-4 py-2 max-w-[200px] truncate">{l.subject}</td>
                   <td className="px-4 py-2">

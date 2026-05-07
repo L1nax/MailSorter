@@ -7,13 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from .db import init_db
-from .core.imap_worker import IMAPWorker
+from .core.account_manager import AccountManager
 from .api import rules, logs, settings
-from .api.status import router as status_router, set_worker
+from .api.accounts import router as accounts_router, set_account_manager
+from .api.status import router as status_router, set_account_manager as set_status_manager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
-worker = IMAPWorker()
+account_manager = AccountManager()
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
 
@@ -21,10 +22,11 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "di
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    set_worker(worker)
-    worker.start()
+    set_account_manager(account_manager)
+    set_status_manager(account_manager)
+    account_manager.start()
     yield
-    worker.stop()
+    account_manager.stop()
 
 
 app = FastAPI(title="MailSort", version="1.0.0", lifespan=lifespan)
@@ -39,10 +41,10 @@ app.add_middleware(
 app.include_router(rules.router)
 app.include_router(logs.router)
 app.include_router(settings.router)
+app.include_router(accounts_router)
 app.include_router(status_router)
 
 
-# API-Key middleware
 @app.middleware("http")
 async def api_key_middleware(request: Request, call_next):
     if request.url.path.startswith("/api/"):
@@ -58,7 +60,6 @@ async def api_key_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# Serve React SPA for all non-API routes
 if os.path.isdir(STATIC_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
 

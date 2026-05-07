@@ -33,6 +33,73 @@ def test_build_prompt_contains_mail_fields():
     assert "INBOX.Rechnungen" in prompt
 
 
+def test_build_prompt_shows_paperless_action_for_pdf():
+    from app.core.imap_worker import RawMail
+    mail = RawMail(
+        uid=1, message_id="<t>", from_address="a@b.com",
+        subject="Rechnung", to_address="me@c.com",
+        body="", has_attachment=True, attachment_types=["application/pdf"],
+    )
+    provider = _DummyProvider()
+    prompt = provider._build_prompt(mail, [])
+    assert "paperless" in prompt
+
+
+def test_build_prompt_hides_paperless_without_pdf():
+    from app.core.imap_worker import RawMail
+    mail = RawMail(
+        uid=1, message_id="<t>", from_address="a@b.com",
+        subject="Test", to_address="me@c.com",
+        body="", has_attachment=False, attachment_types=[],
+    )
+    provider = _DummyProvider()
+    prompt = provider._build_prompt(mail, [])
+    assert "paperless" not in prompt
+
+
+class TestParseResponse:
+    def setup_method(self):
+        self.provider = _DummyProvider()
+        self.folders = ["INBOX.Arbeit", "INBOX.Rechnungen"]
+
+    def test_move_prefix(self):
+        r = self.provider._parse_response("move:INBOX.Arbeit", self.folders)
+        assert r.action == ActionType.move
+        assert r.params["folder"] == "INBOX.Arbeit"
+
+    def test_move_new_folder(self):
+        r = self.provider._parse_response("move:INBOX.Neu", self.folders)
+        assert r.action == ActionType.move
+        assert r.params["folder"] == "INBOX.Neu"
+
+    def test_paperless_with_folder(self):
+        r = self.provider._parse_response("paperless:INBOX.Archiv", self.folders)
+        assert r.action == ActionType.paperless
+        assert r.params["folder"] == "INBOX.Archiv"
+
+    def test_paperless_without_folder(self):
+        r = self.provider._parse_response("paperless", self.folders)
+        assert r.action == ActionType.paperless
+        assert r.params == {}
+
+    def test_keep(self):
+        r = self.provider._parse_response("keep", self.folders)
+        assert r.action == ActionType.keep
+
+    def test_trash(self):
+        r = self.provider._parse_response("trash", self.folders)
+        assert r.action == ActionType.trash
+
+    def test_plain_folder_fallback(self):
+        r = self.provider._parse_response("INBOX.Rechnungen", self.folders)
+        assert r.action == ActionType.move
+        assert r.params["folder"] == "INBOX.Rechnungen"
+
+    def test_empty_response_returns_keep(self):
+        r = self.provider._parse_response("", self.folders)
+        assert r.action == ActionType.keep
+
+
 import anthropic
 from unittest.mock import MagicMock, patch
 from app.core.providers.claude import ClaudeProvider
@@ -58,16 +125,16 @@ class TestClaudeProvider:
         assert result.params["folder"] == "INBOX.Work"
         assert result.warning == ""
 
-    def test_unknown_folder_keeps(self):
+    def test_new_folder_suggestion_accepted(self):
         provider = ClaudeProvider(api_key="key", model="claude-sonnet-4-6")
         mock_resp = MagicMock()
-        mock_resp.content = [MagicMock(text="INBOX.Unknown")]
+        mock_resp.content = [MagicMock(text="INBOX.NewFolder")]
 
         with patch.object(provider.client.messages, "create", return_value=mock_resp):
             result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
 
-        assert result.action == ActionType.keep
-        assert "INBOX.Unknown" in result.warning
+        assert result.action == ActionType.move
+        assert result.params["folder"] == "INBOX.NewFolder"
 
     def test_no_api_key_returns_keep(self):
         provider = ClaudeProvider(api_key="", model="claude-sonnet-4-6")
@@ -110,11 +177,11 @@ class TestOpenAIProvider:
         assert result.action == ActionType.move
         assert result.params["folder"] == "INBOX.Work"
 
-    def test_unknown_folder_keeps(self):
+    def test_new_folder_suggestion_accepted(self):
         provider = OpenAIProvider(api_key="key", model="gpt-4o-mini",
                                    base_url="https://api.openai.com/v1")
         mock_resp = MagicMock()
-        mock_resp.choices[0].message.content = "INBOX.Unknown"
+        mock_resp.choices[0].message.content = "INBOX.NewFolder"
 
         with patch.object(
             provider.client.chat.completions, "create",
@@ -122,8 +189,8 @@ class TestOpenAIProvider:
         ):
             result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
 
-        assert result.action == ActionType.keep
-        assert "INBOX.Unknown" in result.warning
+        assert result.action == ActionType.move
+        assert result.params["folder"] == "INBOX.NewFolder"
 
     def test_no_api_key_returns_keep(self):
         provider = OpenAIProvider(api_key="", model="gpt-4o-mini",

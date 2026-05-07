@@ -1,10 +1,11 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LayoutDashboard, ListFilter, Settings, ScrollText, Mail, Sun, Moon, Zap } from 'lucide-react'
+import { LayoutDashboard, ListFilter, Settings, ScrollText, Mail, Sun, Moon, Zap, Server } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/accounts', label: 'Accounts', icon: Server, end: false },
   { to: '/rules', label: 'Regeln', icon: ListFilter, end: false },
   { to: '/logs', label: 'Audit-Log', icon: ScrollText, end: false },
   { to: '/settings', label: 'Einstellungen', icon: Settings, end: false },
@@ -12,6 +13,7 @@ const nav = [
 
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
+  '/accounts': 'Mail-Accounts',
   '/rules': 'Regeln',
   '/logs': 'Audit-Log',
   '/settings': 'Einstellungen',

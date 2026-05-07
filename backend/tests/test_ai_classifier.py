@@ -33,15 +33,15 @@ class TestClaudeProviderLegacy:
         assert result.params == {"folder": "INBOX.Work"}
         assert result.warning == ""
 
-    def test_unknown_folder_keeps_mail(self):
+    def test_new_folder_suggestion_accepted(self):
         provider = ClaudeProvider(api_key="test-key", model="claude-sonnet-4-6")
         mock_response = MagicMock()
-        mock_response.content = [MagicMock(text="INBOX.Unknown")]
+        mock_response.content = [MagicMock(text="INBOX.NewFolder")]
 
         with patch.object(provider.client.messages, "create", return_value=mock_response):
             result = asyncio.run(
                 provider.classify(_make_mail(), ["INBOX.Work"], "Classify.")
             )
 
-        assert result.action == ActionType.keep
-        assert "INBOX.Unknown" in result.warning
+        assert result.action == ActionType.move
+        assert result.params == {"folder": "INBOX.NewFolder"}

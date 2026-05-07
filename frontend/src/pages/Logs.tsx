@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { logsApi, type AuditLog, type LogsResponse } from '@/api/client'
+import { logsApi, accountsApi, type AuditLog, type LogsResponse } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,9 @@ export default function Logs() {
   const [status, setStatus] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => { accountsApi.list().then(setAccounts) }, [])
 
   const load = async () => {
     const params: Record<string, string | number> = { page, page_size: 50 }
@@ -73,12 +76,16 @@ export default function Logs() {
 
       <Card>
         <CardContent className="p-0">
+          {(() => {
+            const multiAccount = accounts.length > 1
+            return (
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-4 py-2 text-left font-medium">Zeitstempel</th>
                 <th className="px-4 py-2 text-left font-medium">Von</th>
                 <th className="px-4 py-2 text-left font-medium">Betreff</th>
+                {multiAccount && <th className="px-4 py-2 text-left font-medium">Account</th>}
                 <th className="px-4 py-2 text-left font-medium">Regel</th>
                 <th className="px-4 py-2 text-left font-medium">Aktion → Ziel</th>
                 <th className="px-4 py-2 text-left font-medium">Status</th>
@@ -86,7 +93,7 @@ export default function Logs() {
             </thead>
             <tbody>
               {!data || data.items.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Keine Einträge</td></tr>
+                <tr><td colSpan={multiAccount ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">Keine Einträge</td></tr>
               ) : data.items.map((l: AuditLog) => (
                 <tr key={l.id} className="border-b last:border-0 hover:bg-muted/30" title={l.error_msg ?? undefined}>
                   <td className="px-4 py-2 whitespace-nowrap text-muted-foreground text-xs">
@@ -94,6 +101,7 @@ export default function Logs() {
                   </td>
                   <td className="px-4 py-2 max-w-[140px] truncate">{l.from_address}</td>
                   <td className="px-4 py-2 max-w-[200px] truncate">{l.subject}</td>
+                  {multiAccount && <td className="px-4 py-2 text-sm text-muted-foreground">{l.account_name ?? '—'}</td>}
                   <td className="px-4 py-2">
                     {l.rule_name === 'AI'
                       ? <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1"><Sparkles className="h-3 w-3" />KI</Badge>
@@ -113,6 +121,8 @@ export default function Logs() {
               ))}
             </tbody>
           </table>
+            )
+          })()}
         </CardContent>
       </Card>
 

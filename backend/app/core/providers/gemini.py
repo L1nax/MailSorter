@@ -36,11 +36,7 @@ class GeminiProvider(AIProvider):
         try:
             model = self._model or self._get_model(prompt)
             response = await asyncio.to_thread(model.generate_content, user_msg)
-            folder = response.text.strip()
-            if folder in folders:
-                return ClassificationResult(ActionType.move, {"folder": folder})
-            log.warning("Gemini returned unknown folder %r", folder)
-            return ClassificationResult(ActionType.keep, {}, f"AI returned unknown folder: {folder}")
+            return self._parse_response(response.text, folders)
         except Exception as exc:
             log.exception("Gemini classifier error")
             return ClassificationResult(ActionType.keep, {}, f"AI failed: {exc}")

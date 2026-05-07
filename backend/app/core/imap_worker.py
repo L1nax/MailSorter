@@ -10,10 +10,11 @@ from email import policy
 from email.utils import parseaddr
 from typing import Any
 from imapclient import IMAPClient
-from sqlmodel import Session, select
+from sqlmodel import Session, select, or_
 from ..db import engine
 from ..config import get_setting
 from ..models import Rule, AuditLog, AuditStatus
+from ..models.account import MailAccount
 from .rule_engine import RuleEngine, MailData
 from .action_executor import ActionExecutor
 
@@ -30,7 +31,7 @@ class RawMail:
     body: str
     has_attachment: bool
     attachment_types: list[str]
-    raw_attachments: list[tuple[str, bytes]] = field(default_factory=list)  # (filename, data)
+    raw_attachments: list[tuple[str, bytes]] = field(default_factory=list)
 
 
 def _extract_body(msg: email.message.Message) -> str:
@@ -93,76 +94,75 @@ def test_imap_connection(host: str, port: int, user: str, password: str, tls: bo
             imap.login(user, password)
         return True, "Connection successful"
     except Exception as exc:
-        return False, str(exc)
+        msg = exc.args[0] if exc.args else exc
+        if isinstance(msg, bytes):
+            msg = msg.decode('utf-8', errors='replace')
+        else:
+            msg = str(msg)
+            if len(msg) > 3 and msg[0] == 'b' and msg[1] in ('"', "'") and msg[-1] == msg[1]:
+                msg = msg[2:-1]
+        return False, str(msg)
 
 
 class IMAPWorker:
-    def __init__(self) -> None:
+    def __init__(self, account: MailAccount) -> None:
+        self.account = account
         self.running = False
-        self._task: asyncio.Task | None = None
         self._process_event = threading.Event()
 
-    def start(self) -> None:
-        if self.running:
-            return
+    async def run(self) -> None:
         self.running = True
-        loop = asyncio.get_running_loop()
-        self._task = loop.create_task(self._run())
-        log.info("IMAPWorker started")
-
-    def stop(self) -> None:
-        self.running = False
-        if self._task:
-            self._task.cancel()
-        log.info("IMAPWorker stopped")
+        try:
+            await self._run()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self.running = False
 
     async def _run(self) -> None:
         while self.running:
-            with Session(engine) as s:
-                use_idle = get_setting(s, "use_idle") == "true"
-            if use_idle:
+            if self.account.use_idle:
                 try:
                     await asyncio.to_thread(self._run_idle_sync)
                 except Exception:
-                    log.exception("IDLE error, reconnecting in 30s")
+                    log.exception("IDLE error for account '%s', reconnecting in 30s", self.account.name)
                     await asyncio.sleep(30)
             else:
                 try:
                     await self.process_once()
                 except Exception:
-                    log.exception("IMAPWorker loop error")
-                with Session(engine) as s:
-                    interval = int(get_setting(s, "poll_interval_seconds"))
-                await asyncio.sleep(interval)
+                    log.exception("IMAPWorker loop error for account '%s'", self.account.name)
+                await asyncio.sleep(self.account.poll_interval_seconds)
 
     async def process_once(self) -> None:
+        if self.account.use_idle and self.running:
+            self._process_event.set()
+            return
+
+        if not self.account.imap_host or not self.account.imap_user or not self.account.imap_password:
+            log.debug("Account '%s' not configured, skipping", self.account.name)
+            return
+
         with Session(engine) as session:
-            use_idle = get_setting(session, "use_idle") == "true"
-            host = get_setting(session, "imap_host")
-            port = int(get_setting(session, "imap_port"))
-            user = get_setting(session, "imap_user")
-            password = get_setting(session, "imap_password")
-            tls = get_setting(session, "imap_tls") == "true"
-            folder = get_setting(session, "imap_folder")
-            trash = get_setting(session, "trash_folder")
             ai_enabled = get_setting(session, "ai_enabled") == "true"
             ai_key = get_setting(session, "ai_api_key")
             ai_model = get_setting(session, "ai_model")
             ai_prompt = get_setting(session, "ai_system_prompt")
 
-        if use_idle and self.running:
-            # IDLE-Loop läuft bereits – Verarbeitung über Event signalisieren
-            self._process_event.set()
-            return
-
-        if not host or not user or not password:
-            log.debug("IMAP not configured, skipping")
-            return
-
         try:
-            await asyncio.to_thread(self._process_imap, host, port, user, password, tls, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
+            await asyncio.to_thread(
+                self._process_imap,
+                self.account.imap_host,
+                self.account.imap_port,
+                self.account.imap_user,
+                self.account.imap_password,
+                self.account.imap_tls,
+                self.account.imap_folder,
+                self.account.trash_folder,
+                ai_enabled, ai_key, ai_model, ai_prompt,
+            )
         except Exception:
-            log.exception("IMAP processing error")
+            log.exception("IMAP processing error for account '%s'", self.account.name)
 
     def _process_imap(
         self,
@@ -181,14 +181,21 @@ class IMAPWorker:
         folder: str, trash: str,
         ai_enabled: bool, ai_key: str, ai_model: str, ai_prompt: str,
     ) -> None:
-        """Verarbeitet alle UNSEEN-Mails auf einer bereits offenen, authentifizierten Verbindung."""
-        uids = imap.search(["UNSEEN"])
+        try:
+            uids = imap.search(["UNSEEN", "UNKEYWORD", "$MailSortProcessed"])
+        except Exception:
+            uids = imap.search(["UNSEEN"])
         if not uids:
             return
-        log.info("Found %d unseen mails", len(uids))
+        log.info("Account '%s': %d ungelesene Mails gefunden", self.account.name, len(uids))
 
         with Session(engine) as session:
-            rules = session.exec(select(Rule).where(Rule.enabled == True).order_by(Rule.priority)).all()
+            rules = session.exec(
+                select(Rule)
+                .where(Rule.enabled == True)
+                .where(or_(Rule.account_id == None, Rule.account_id == self.account.id))
+                .order_by(Rule.priority)
+            ).all()
 
         rule_engine = RuleEngine(list(rules))
         executor = ActionExecutor(imap, trash_folder=trash)
@@ -208,39 +215,41 @@ class IMAPWorker:
                 mail = _parse_mail(uid, raw_bytes)
                 self._process_single(mail, rule_engine, executor, imap, ai_enabled, ai_key, ai_model, ai_prompt, folder)
             except Exception:
-                log.exception("Error processing UID %s", uid)
+                log.exception("Error processing UID %s on account '%s'", uid, self.account.name)
+            finally:
+                try:
+                    imap.add_flags([uid], [b"$MailSortProcessed"])
+                except Exception:
+                    pass
 
     def _run_idle_sync(self) -> None:
-        """Blockierender IDLE-Loop – läuft in einem Thread via asyncio.to_thread."""
-        # RFC 2177: Server dürfen IDLE nach 29 min beenden; wir erneuern nach 20 min.
         IDLE_REFRESH_SECS = 20 * 60
-        IDLE_CHECK_SECS = 30  # Granularität, mit der self.running geprüft wird
+        IDLE_CHECK_SECS = 30
+
+        host = self.account.imap_host
+        port = self.account.imap_port
+        user = self.account.imap_user
+        password = self.account.imap_password
+        tls = self.account.imap_tls
+        folder = self.account.imap_folder
+        trash = self.account.trash_folder
+
+        if not host or not user or not password:
+            log.debug("Account '%s' not configured, skipping IDLE", self.account.name)
+            return
 
         with Session(engine) as s:
-            host = get_setting(s, "imap_host")
-            port = int(get_setting(s, "imap_port"))
-            user = get_setting(s, "imap_user")
-            password = get_setting(s, "imap_password")
-            tls = get_setting(s, "imap_tls") == "true"
-            folder = get_setting(s, "imap_folder")
-            trash = get_setting(s, "trash_folder")
             ai_enabled = get_setting(s, "ai_enabled") == "true"
             ai_key = get_setting(s, "ai_api_key")
             ai_model = get_setting(s, "ai_model")
             ai_prompt = get_setting(s, "ai_system_prompt")
 
-        if not host or not user or not password:
-            log.debug("IMAP not configured, skipping IDLE")
-            return
-
         with IMAPClient(host, port=port, ssl=tls) as imap:
             imap.login(user, password)
             imap.select_folder(folder, readonly=False)
-
-            # Vorhandene ungelesene Mails vor IDLE-Eintritt verarbeiten
             self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
 
-            log.info("IDLE mode: entering IDLE")
+            log.info("Account '%s': IDLE-Modus aktiv", self.account.name)
             imap.idle()
             idle_start = time.monotonic()
 
@@ -248,7 +257,7 @@ class IMAPWorker:
                 try:
                     responses = imap.idle_check(timeout=IDLE_CHECK_SECS)
                 except Exception:
-                    log.exception("IDLE: idle_check fehlgeschlagen, Verbindung wird neu aufgebaut")
+                    log.exception("IDLE: idle_check fehlgeschlagen für '%s'", self.account.name)
                     return
 
                 elapsed = time.monotonic() - idle_start
@@ -259,34 +268,31 @@ class IMAPWorker:
                 )
                 force = self._process_event.is_set()
 
-                log.debug("IDLE: check — responses=%s has_new=%s elapsed=%.0fs", responses, has_new, elapsed)
-
                 if has_new or elapsed >= IDLE_REFRESH_SECS or force:
                     try:
                         imap.idle_done()
                     except Exception:
-                        log.exception("IDLE: idle_done fehlgeschlagen, Verbindung wird neu aufgebaut")
+                        log.exception("IDLE: idle_done fehlgeschlagen für '%s'", self.account.name)
                         return
 
                     self._process_event.clear()
 
                     if has_new or force:
-                        log.info("IDLE: %s", "manuell ausgelöst" if force and not has_new else "EXISTS-Benachrichtigung, verarbeite Mails")
                         try:
                             imap.select_folder(folder, readonly=False)
                             self._process_imap_session(imap, folder, trash, ai_enabled, ai_key, ai_model, ai_prompt)
                         except Exception:
-                            log.exception("IDLE: Verarbeitung fehlgeschlagen, Verbindung wird neu aufgebaut")
+                            log.exception("IDLE: Verarbeitung fehlgeschlagen für '%s'", self.account.name)
                             return
                     else:
-                        log.info("IDLE: Verbindung nach %.0fs erneuert", elapsed)
+                        log.info("IDLE: Verbindung für '%s' nach %.0fs erneuert", self.account.name, elapsed)
 
                     try:
                         imap.select_folder(folder, readonly=False)
                         imap.idle()
                         idle_start = time.monotonic()
                     except Exception:
-                        log.exception("IDLE: Neustart des IDLE fehlgeschlagen, Verbindung wird neu aufgebaut")
+                        log.exception("IDLE: Neustart fehlgeschlagen für '%s'", self.account.name)
                         return
 
             try:
@@ -331,10 +337,37 @@ class IMAPWorker:
             import asyncio as _asyncio
             with Session(engine) as s:
                 from .providers import get_provider as _get_provider
-                from sqlmodel import select as _select
                 _provider = _get_provider(s)
-                target_folders = [r.action_params.get("folder", "") for r in s.exec(_select(Rule)).all() if r.action_params.get("folder")]
-            ai_result = _asyncio.run(_provider.classify(mail, target_folders, ai_prompt))
+                account_rules = s.exec(
+                    select(Rule)
+                    .where(Rule.enabled == True)
+                    .where(or_(Rule.account_id == None, Rule.account_id == self.account.id))
+                ).all()
+                target_folders = [
+                    r.action_params.get("folder", "")
+                    for r in account_rules
+                    if r.action_params and r.action_params.get("folder")
+                ]
+                paperless_url = get_setting(s, "paperless_url")
+                paperless_token = get_setting(s, "paperless_token")
+            has_pdf = any("pdf" in t.lower() for t in mail.attachment_types)
+            paperless_ok = bool(paperless_url and paperless_token)
+            effective_prompt = ai_prompt
+            if paperless_ok and has_pdf:
+                effective_prompt += (
+                    "\n\nPaperless-NGX ist konfiguriert. "
+                    "Nutze paperless:<Ordner> oder paperless für PDF-Anhänge, die archiviert werden sollen."
+                )
+            format_lines = ["move:<Ordner>"]
+            if paperless_ok and has_pdf:
+                format_lines += ["paperless:<Ordner>", "paperless"]
+            format_lines += ["keep", "trash"]
+            effective_prompt += (
+                "\n\nAntworte ausschließlich mit einer der folgenden Aktionen – "
+                "kein weiterer Text, keine Erklärung:\n"
+                + "\n".join(f"  {a}" for a in format_lines)
+            )
+            ai_result = _asyncio.run(_provider.classify(mail, target_folders, effective_prompt))
             rule_name = "AI"
             action_type = ai_result.action
             action_params = ai_result.params
@@ -344,12 +377,13 @@ class IMAPWorker:
             action_type = "keep"
             rule_name = rule_name or "no match"
 
-        # Phase 1: Log-Eintrag schreiben, bevor die Aktion ausgeführt wird
-        log_id = self._create_log_entry(mail, rule_id, rule_name, str(action_type))
+        log_id = self._create_log_entry(
+            mail, rule_id, rule_name, str(action_type),
+            self.account.id, self.account.name,
+        )
 
         mark_as_read: bool = action_params.get("mark_as_read", False)
 
-        # Phase 2: Aktion ausführen
         if str(action_type) == "keep":
             if mark_as_read:
                 imap.set_flags(mail.uid, [b"\\Seen"])
@@ -375,8 +409,6 @@ class IMAPWorker:
 
         exec_result = executor.execute(mail, action_type, action_params)
         status = AuditStatus.success if exec_result.success else AuditStatus.error
-
-        # Phase 3: Log-Eintrag finalisieren
         self._finalize_log_entry(log_id, exec_result.target, status, exec_result.error or ai_warning)
 
         if exec_result.success and mark_as_read:
@@ -388,6 +420,8 @@ class IMAPWorker:
         rule_id: str | None,
         rule_name: str | None,
         action: str,
+        account_id: str = "",
+        account_name: str = "",
     ) -> str:
         with Session(engine) as s:
             entry = AuditLog(
@@ -399,6 +433,8 @@ class IMAPWorker:
                 rule_name=rule_name,
                 action=action,
                 status=AuditStatus.processing,
+                account_id=account_id or None,
+                account_name=account_name or None,
             )
             s.add(entry)
             s.commit()

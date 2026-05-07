@@ -23,6 +23,8 @@ class AuditLog(SQLModel, table=True):
     target: str | None = None
     status: AuditStatus = AuditStatus.success
     error_msg: str | None = None
+    account_id: str | None = Field(default=None, nullable=True)
+    account_name: str | None = Field(default=None, nullable=True)
 
 
 class AuditLogRead(SQLModel):
@@ -37,6 +39,8 @@ class AuditLogRead(SQLModel):
     target: str | None
     status: AuditStatus
     error_msg: str | None
+    account_id: str | None
+    account_name: str | None
 
 
 class AuditLogFilter(SQLModel):
