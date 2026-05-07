@@ -1,5 +1,6 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlmodel import Session, select
 from ..db import get_session
 from ..models.account import MailAccount, MailAccountCreate, MailAccountUpdate, MailAccountRead
@@ -58,15 +59,21 @@ def create_account(body: MailAccountCreate, session: Session = Depends(get_sessi
     return _mask(account)
 
 
+class ImapTestRequest(BaseModel):
+    imap_host: str = ""
+    imap_port: int = 993
+    imap_user: str = ""
+    imap_password: str = ""
+    imap_tls: bool = True
+
+
 @router.post("/test-imap")
-def test_imap_params(body: dict, session: Session = Depends(get_session)):
+def test_imap_params(body: ImapTestRequest):
     """Verbindungstest mit beliebigen Parametern (vor dem Speichern)."""
     ok, msg = test_imap_connection(
-        body.get("imap_host", ""),
-        int(body.get("imap_port", 993)),
-        body.get("imap_user", ""),
-        body.get("imap_password", ""),
-        bool(body.get("imap_tls", True)),
+        body.imap_host, body.imap_port,
+        body.imap_user, body.imap_password,
+        body.imap_tls,
     )
     return {"ok": ok, "message": msg}
 
