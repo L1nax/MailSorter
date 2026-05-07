@@ -34,10 +34,11 @@ class OpenAIProvider(AIProvider):
                 ],
             )
             folder = response.choices[0].message.content.strip()
-            if folder in folders:
-                return ClassificationResult(ActionType.move, {"folder": folder})
-            log.warning("OpenAI returned unknown folder %r", folder)
-            return ClassificationResult(ActionType.keep, {}, f"AI returned unknown folder: {folder}")
+            if not folder or len(folder) > 100:
+                return ClassificationResult(ActionType.keep, {}, f"AI returned invalid folder: {folder!r}")
+            if folder not in folders:
+                log.info("OpenAI suggested new folder %r", folder)
+            return ClassificationResult(ActionType.move, {"folder": folder})
         except Exception as exc:
             log.exception("OpenAI classifier error")
             return ClassificationResult(ActionType.keep, {}, f"AI failed: {exc}")

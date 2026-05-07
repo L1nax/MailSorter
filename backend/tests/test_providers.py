@@ -58,16 +58,16 @@ class TestClaudeProvider:
         assert result.params["folder"] == "INBOX.Work"
         assert result.warning == ""
 
-    def test_unknown_folder_keeps(self):
+    def test_new_folder_suggestion_accepted(self):
         provider = ClaudeProvider(api_key="key", model="claude-sonnet-4-6")
         mock_resp = MagicMock()
-        mock_resp.content = [MagicMock(text="INBOX.Unknown")]
+        mock_resp.content = [MagicMock(text="INBOX.NewFolder")]
 
         with patch.object(provider.client.messages, "create", return_value=mock_resp):
             result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
 
-        assert result.action == ActionType.keep
-        assert "INBOX.Unknown" in result.warning
+        assert result.action == ActionType.move
+        assert result.params["folder"] == "INBOX.NewFolder"
 
     def test_no_api_key_returns_keep(self):
         provider = ClaudeProvider(api_key="", model="claude-sonnet-4-6")
@@ -110,11 +110,11 @@ class TestOpenAIProvider:
         assert result.action == ActionType.move
         assert result.params["folder"] == "INBOX.Work"
 
-    def test_unknown_folder_keeps(self):
+    def test_new_folder_suggestion_accepted(self):
         provider = OpenAIProvider(api_key="key", model="gpt-4o-mini",
                                    base_url="https://api.openai.com/v1")
         mock_resp = MagicMock()
-        mock_resp.choices[0].message.content = "INBOX.Unknown"
+        mock_resp.choices[0].message.content = "INBOX.NewFolder"
 
         with patch.object(
             provider.client.chat.completions, "create",
@@ -122,8 +122,8 @@ class TestOpenAIProvider:
         ):
             result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
 
-        assert result.action == ActionType.keep
-        assert "INBOX.Unknown" in result.warning
+        assert result.action == ActionType.move
+        assert result.params["folder"] == "INBOX.NewFolder"
 
     def test_no_api_key_returns_keep(self):
         provider = OpenAIProvider(api_key="", model="gpt-4o-mini",
