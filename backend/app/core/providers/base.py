@@ -25,6 +25,9 @@ class AIProvider(ABC):
     @abstractmethod
     async def test_connection(self) -> tuple[bool, str]: ...
 
+    async def list_models(self) -> list[str]:
+        return []
+
     def _build_prompt(self, mail: "RawMail", folders: list[str]) -> str:
         folders_str = "\n".join(f"- {f}" for f in folders)
         return (

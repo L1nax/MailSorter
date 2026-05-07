@@ -45,6 +45,21 @@ class GeminiProvider(AIProvider):
             log.exception("Gemini classifier error")
             return ClassificationResult(ActionType.keep, {}, f"AI failed: {exc}")
 
+    async def list_models(self) -> list[str]:
+        fallback = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash", "gemini-1.5-flash-8b"]
+        if not self.api_key:
+            return fallback
+        try:
+            models = await asyncio.to_thread(genai.list_models)
+            ids = [
+                m.name.removeprefix("models/")
+                for m in models
+                if "generateContent" in (m.supported_generation_methods or [])
+            ]
+            return sorted(ids) or fallback
+        except Exception:
+            return fallback
+
     async def test_connection(self) -> tuple[bool, str]:
         if not self.api_key:
             return False, "No API key configured"

@@ -3,7 +3,7 @@ import { statusApi, logsApi, type Status, type AuditLog } from '@/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Play, Square, RefreshCw, Mail, CheckCircle, AlertCircle, Circle, Bot } from 'lucide-react'
+import { Play, Square, RefreshCw, Mail, CheckCircle, AlertCircle, Circle, Bot, Sparkles, ListFilter } from 'lucide-react'
 
 const REFRESH_INTERVAL_MS = 30_000
 
@@ -140,18 +140,26 @@ export default function Dashboard() {
                 <th className="px-4 py-2 text-left font-medium">Zeit</th>
                 <th className="px-4 py-2 text-left font-medium">Von</th>
                 <th className="px-4 py-2 text-left font-medium">Betreff</th>
+                <th className="px-4 py-2 text-left font-medium">Regel</th>
                 <th className="px-4 py-2 text-left font-medium">Aktion</th>
                 <th className="px-4 py-2 text-left font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
               {logs.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Keine Einträge</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Keine Einträge</td></tr>
               ) : logs.map(l => (
                 <tr key={l.id} className="border-b last:border-0 hover:bg-muted/30">
                   <td className="px-4 py-2 whitespace-nowrap text-muted-foreground">{new Date(l.timestamp).toLocaleTimeString('de')}</td>
                   <td className="px-4 py-2 max-w-[160px] truncate">{l.from_address}</td>
                   <td className="px-4 py-2 max-w-[200px] truncate">{l.subject}</td>
+                  <td className="px-4 py-2">
+                    {l.rule_name === 'AI'
+                      ? <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1"><Sparkles className="h-3 w-3" />KI</Badge>
+                      : l.rule_name
+                        ? <Badge variant="outline" className="gap-1"><ListFilter className="h-3 w-3" />{l.rule_name}</Badge>
+                        : <span className="text-muted-foreground text-xs">–</span>}
+                  </td>
                   <td className="px-4 py-2">{l.action}{l.target ? ` → ${l.target}` : ''}</td>
                   <td className="px-4 py-2">
                     {l.status === 'success'

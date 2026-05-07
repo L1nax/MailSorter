@@ -79,6 +79,25 @@ async def test_paperless(body: PaperlessTestRequest, session: Session = Depends(
     return {"ok": ok, "message": msg}
 
 
+@router.get("/ai-models")
+async def list_ai_models(
+    provider: str = "claude",
+    api_key: str = "",
+    base_url: str = "",
+    session: Session = Depends(get_session),
+):
+    from ..core.providers import make_provider
+    resolved_key = (
+        get_setting(session, "ai_api_key")
+        if api_key in (_SENTINEL, "")
+        else api_key
+    )
+    resolved_base_url = base_url or get_setting(session, "ai_base_url")
+    prov = make_provider(provider, resolved_key, "", resolved_base_url)
+    models = await prov.list_models()
+    return {"models": models}
+
+
 @router.post("/test-ai")
 async def test_ai(body: AiTestRequest, session: Session = Depends(get_session)):
     from ..core.providers import make_provider

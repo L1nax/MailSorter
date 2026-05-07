@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { settingsApi, type Settings } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
 
 type TestState = { loading: boolean; ok?: boolean; message?: string }
 
@@ -35,8 +35,31 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [customModel, setCustomModel] = useState(false)
+  const fetchIdRef = useRef(0)
 
-  useEffect(() => { settingsApi.get().then(setSettings) }, [])
+  const DEFAULT_MODELS: Record<string, string> = {
+    claude: 'claude-sonnet-4-6', openai: 'gpt-4o-mini', gemini: 'gemini-2.0-flash', ollama: 'llama3.2',
+  }
+
+  const fetchModels = useCallback(async (provider: string, apiKey: string, baseUrl: string) => {
+    const id = ++fetchIdRef.current
+    setLoadingModels(true)
+    try {
+      const result = await settingsApi.listAiModels({ provider, api_key: apiKey, base_url: baseUrl })
+      if (id !== fetchIdRef.current) return
+      setAvailableModels(result.models)
+    } catch {
+      if (id !== fetchIdRef.current) return
+      setAvailableModels([])
+    } finally {
+      if (id === fetchIdRef.current) setLoadingModels(false)
+    }
+  }, [])
+
+  useEffect(() => { settingsApi.get().then(s => { setSettings(s); fetchModels(s.ai_provider, s.ai_api_key, s.ai_base_url) }) }, [])
 
   const update = <K extends keyof Settings>(k: K, v: Settings[K]) =>
     setSettings(s => s ? { ...s, [k]: v } : s)
@@ -159,7 +182,13 @@ export default function SettingsPage() {
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                   value={settings.ai_provider}
-                  onChange={e => update('ai_provider', e.target.value)}
+                  onChange={e => {
+                    const p = e.target.value
+                    update('ai_provider', p)
+                    update('ai_model', DEFAULT_MODELS[p] ?? '')
+                    setCustomModel(false)
+                    fetchModels(p, settings.ai_api_key, settings.ai_base_url)
+                  }}
                 >
                   <option value="claude">Claude (Anthropic)</option>
                   <option value="openai">OpenAI</option>
@@ -183,9 +212,47 @@ export default function SettingsPage() {
                 </div>
               )}
               <div className="space-y-1">
-                <Label>Modell</Label>
-                <Input value={settings.ai_model} onChange={e => update('ai_model', e.target.value)}
-                  placeholder={{ claude: 'claude-sonnet-4-6', openai: 'gpt-4o-mini', gemini: 'gemini-2.0-flash', ollama: 'llama3.2' }[settings.ai_provider] ?? ''} />
+                <div className="flex items-center gap-2">
+                  <Label>Modell</Label>
+                  {loadingModels
+                    ? <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    : <button type="button" title="Modellliste neu laden"
+                        onClick={() => fetchModels(settings.ai_provider, settings.ai_api_key, settings.ai_base_url)}
+                        className="text-muted-foreground hover:text-foreground transition-colors">
+                        <RefreshCw className="h-3 w-3" />
+                      </button>
+                  }
+                </div>
+                {availableModels.length > 0 && !customModel ? (
+                  <select
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                    value={availableModels.includes(settings.ai_model) ? settings.ai_model : '__custom__'}
+                    onChange={e => {
+                      if (e.target.value === '__custom__') { setCustomModel(true) }
+                      else { update('ai_model', e.target.value) }
+                    }}
+                  >
+                    {!availableModels.includes(settings.ai_model) && settings.ai_model && (
+                      <option value={settings.ai_model}>{settings.ai_model}</option>
+                    )}
+                    {availableModels.map(m => <option key={m} value={m}>{m}</option>)}
+                    <option value="__custom__">— Benutzerdefiniert eingeben …</option>
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      value={settings.ai_model}
+                      onChange={e => update('ai_model', e.target.value)}
+                      placeholder={DEFAULT_MODELS[settings.ai_provider] ?? ''}
+                    />
+                    {availableModels.length > 0 && (
+                      <button type="button" onClick={() => setCustomModel(false)}
+                        className="text-xs text-muted-foreground hover:text-foreground whitespace-nowrap">
+                        ← Liste
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <Label>System-Prompt</Label>

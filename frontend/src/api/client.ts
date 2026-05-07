@@ -124,6 +124,10 @@ export const settingsApi = {
   testImap: (params: ImapTestParams) => request<{ ok: boolean; message: string }>('/settings/test-imap', { method: 'POST', body: JSON.stringify(params) }),
   testPaperless: (params: { paperless_url: string; paperless_token: string }) => request<{ ok: boolean; message: string }>('/settings/test-paperless', { method: 'POST', body: JSON.stringify(params) }),
   testAi: (params: { ai_provider: string; ai_api_key: string; ai_model: string; ai_base_url: string }) => request<{ ok: boolean; message: string }>('/settings/test-ai', { method: 'POST', body: JSON.stringify(params) }),
+  listAiModels: (params: { provider: string; api_key?: string; base_url?: string }) => {
+    const q = new URLSearchParams({ provider: params.provider, api_key: params.api_key ?? '', base_url: params.base_url ?? '' })
+    return request<{ models: string[] }>(`/settings/ai-models?${q}`)
+  },
 }
 
 // Status

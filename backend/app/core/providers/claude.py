@@ -55,6 +55,16 @@ class ClaudeProvider(AIProvider):
         log.error("Claude classifier failed after retries: %s", last_error)
         return ClassificationResult(ActionType.keep, {}, f"AI failed: {last_error}")
 
+    async def list_models(self) -> list[str]:
+        return [
+            "claude-opus-4-7",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001",
+            "claude-opus-4-5",
+            "claude-sonnet-4-5",
+            "claude-haiku-4-5",
+        ]
+
     async def test_connection(self) -> tuple[bool, str]:
         if not self.api_key:
             return False, "No API key configured"

@@ -42,6 +42,23 @@ class OpenAIProvider(AIProvider):
             log.exception("OpenAI classifier error")
             return ClassificationResult(ActionType.keep, {}, f"AI failed: {exc}")
 
+    async def list_models(self) -> list[str]:
+        is_ollama = self.api_key == "ollama"
+        fallback = (
+            ["llama3.2", "llama3.1", "mistral", "qwen2.5", "phi4", "gemma3", "deepseek-r2"]
+            if is_ollama
+            else ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "o1", "o1-mini", "o3", "o3-mini", "o4-mini"]
+        )
+        try:
+            response = await self.client.models.list()
+            ids = [m.id for m in response.data]
+            if is_ollama:
+                return sorted(ids)
+            chat = [i for i in ids if i.startswith("gpt-") or (len(i) >= 2 and i[0] == "o" and i[1].isdigit())]
+            return sorted(chat) or fallback
+        except Exception:
+            return fallback
+
     async def test_connection(self) -> tuple[bool, str]:
         try:
             await self.client.chat.completions.create(

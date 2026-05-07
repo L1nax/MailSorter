@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Download, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { Download, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, RefreshCw, Sparkles, ListFilter } from 'lucide-react'
 
 export default function Logs() {
   const [data, setData] = useState<LogsResponse | null>(null)
@@ -95,7 +95,11 @@ export default function Logs() {
                   <td className="px-4 py-2 max-w-[140px] truncate">{l.from_address}</td>
                   <td className="px-4 py-2 max-w-[200px] truncate">{l.subject}</td>
                   <td className="px-4 py-2">
-                    {l.rule_name ? <Badge variant="outline">{l.rule_name}</Badge> : <span className="text-muted-foreground">–</span>}
+                    {l.rule_name === 'AI'
+                      ? <Badge className="bg-purple-100 text-purple-700 border-purple-200 gap-1"><Sparkles className="h-3 w-3" />KI</Badge>
+                      : l.rule_name
+                        ? <Badge variant="outline" className="gap-1"><ListFilter className="h-3 w-3" />{l.rule_name}</Badge>
+                        : <span className="text-muted-foreground">–</span>}
                   </td>
                   <td className="px-4 py-2 text-xs">{l.action}{l.target ? ` → ${l.target}` : ''}</td>
                   <td className="px-4 py-2">

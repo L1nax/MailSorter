@@ -73,7 +73,7 @@ def get_status(session: Session = Depends(get_session)):
 
 
 @router.post("/worker/start", status_code=204)
-def start_worker():
+async def start_worker():
     if _worker_ref:
         _worker_ref.start()
 
