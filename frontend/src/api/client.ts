@@ -156,6 +156,7 @@ export const accountsApi = {
     request<{ ok: boolean; message: string }>('/accounts/test-imap', { method: 'POST', body: JSON.stringify(params) }),
   testImapById: (id: string) => request<{ ok: boolean; message: string }>(`/accounts/${id}/test-imap`, { method: 'POST' }),
   processNow: (id: string) => request<void>(`/accounts/${id}/process-now`, { method: 'POST' }),
+  resetFlags: (id: string) => request<void>(`/accounts/${id}/reset-flags`, { method: 'POST' }),
 }
 
 // Status

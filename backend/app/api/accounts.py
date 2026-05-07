@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -119,3 +120,24 @@ async def process_account_now(account_id: str, session: Session = Depends(get_se
     _get_or_404(account_id, session)
     if _manager_ref:
         await _manager_ref.process_account_now(account_id)
+
+
+@router.post("/{account_id}/reset-flags", status_code=204)
+def reset_account_flags(account_id: str, session: Session = Depends(get_session)):
+    account = _get_or_404(account_id, session)
+    _reset_flags_sync(account)
+
+
+def _reset_flags_sync(account) -> None:
+    from imapclient import IMAPClient
+    if not account.imap_host or not account.imap_user or not account.imap_password:
+        return
+    with IMAPClient(account.imap_host, port=account.imap_port, ssl=account.imap_tls) as imap:
+        imap.login(account.imap_user, account.imap_password)
+        imap.select_folder(account.imap_folder, readonly=False)
+        try:
+            uids = imap.search(["KEYWORD", "$MailSortProcessed"])
+        except Exception:
+            return
+        if uids:
+            imap.remove_flags(uids, [b"$MailSortProcessed"])

@@ -146,6 +146,7 @@ function AccountForm({
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<MailAccount[]>([])
   const [editing, setEditing] = useState<{ id?: string; open: boolean }>({ open: false })
+  const [resetting, setResetting] = useState<string | null>(null)
 
   const load = async () => setAccounts(await accountsApi.list())
   useEffect(() => { load() }, [])
@@ -169,6 +170,16 @@ export default function AccountsPage() {
   const handleToggle = async (account: MailAccount) => {
     await accountsApi.update(account.id, { enabled: !account.enabled })
     await load()
+  }
+
+  const handleResetFlags = async (id: string) => {
+    if (!confirm('$MailSortProcessed-Flag für alle Mails im Posteingang entfernen? Mails werden beim nächsten Abruf erneut verarbeitet.')) return
+    setResetting(id)
+    try {
+      await accountsApi.resetFlags(id)
+    } finally {
+      setResetting(null)
+    }
   }
 
   return (
@@ -226,6 +237,17 @@ export default function AccountsPage() {
                     <CardTitle className="text-base">{account.name}</CardTitle>
                     <div className="flex items-center gap-2">
                       <Switch checked={account.enabled} onCheckedChange={() => handleToggle(account)} />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Mails neu verarbeiten (Flag zurücksetzen)"
+                        onClick={() => handleResetFlags(account.id)}
+                        disabled={resetting === account.id}
+                      >
+                        {resetting === account.id
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : <RefreshCw className="h-4 w-4" />}
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditing({ id: account.id, open: true })}>
                         <Edit2 className="h-4 w-4" />
                       </Button>
