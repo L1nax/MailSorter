@@ -86,8 +86,9 @@ def _parse_mail(uid: int, raw: bytes) -> RawMail:
 
 
 def test_imap_connection(host: str, port: int, user: str, password: str, tls: bool) -> tuple[bool, str]:
-    if not host or not user or not password:
-        return False, "IMAP not fully configured"
+    missing = [name for name, val in [("Host", host), ("Benutzer", user), ("Passwort", password)] if not val]
+    if missing:
+        return False, f"IMAP nicht vollständig konfiguriert – fehlt: {', '.join(missing)}"
     try:
         with IMAPClient(host, port=port, ssl=tls) as imap:
             imap.login(user, password)

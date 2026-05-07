@@ -109,13 +109,21 @@ export default function SettingsPage() {
               <Input type="number" value={settings.poll_interval_seconds} onChange={e => update('poll_interval_seconds', Number(e.target.value))} className="w-32" />
             </div>
           )}
-          <TestButton label="IMAP testen" onTest={() => settingsApi.testImap({
-            imap_host: settings.imap_host,
-            imap_port: settings.imap_port,
-            imap_user: settings.imap_user,
-            imap_password: settings.imap_password,
-            imap_tls: settings.imap_tls,
-          })} />
+          <TestButton label="IMAP testen" onTest={() => {
+            const missing: string[] = []
+            if (!settings.imap_host) missing.push('Host')
+            if (!settings.imap_user) missing.push('Benutzer')
+            if (!settings.imap_password) missing.push('Passwort')
+            if (missing.length > 0)
+              return Promise.resolve({ ok: false, message: `Fehlende Felder: ${missing.join(', ')}` })
+            return settingsApi.testImap({
+              imap_host: settings.imap_host,
+              imap_port: settings.imap_port,
+              imap_user: settings.imap_user,
+              imap_password: settings.imap_password,
+              imap_tls: settings.imap_tls,
+            })
+          }} />
         </CardContent>
       </Card>
 
