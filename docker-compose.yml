@@ -1,10 +1,12 @@
 version: '3.8'
 
 services:
-  mailsort:
-    build: .
-    image: mailsort:latest
-    container_name: mailsort
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mailsort-backend:latest
+    container_name: mailsort-backend
     restart: unless-stopped
     ports:
       - '8080:8080'
@@ -12,5 +14,24 @@ services:
       - ./data:/data
     environment:
       - MAILSORT_DATA_DIR=/data
-      # Optional: set a secret key for session encryption
       # - MAILSORT_SECRET_KEY=change-me
+    networks:
+      - mailsort
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: mailsort-frontend:latest
+    container_name: mailsort-frontend
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    depends_on:
+      - backend
+    networks:
+      - mailsort
+
+networks:
+  mailsort:
+    driver: bridge
