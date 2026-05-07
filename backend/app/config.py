@@ -3,15 +3,6 @@ from sqlmodel import Session, select
 from .models.settings import Settings, SettingsRead
 
 DEFAULTS: dict[str, str] = {
-    "imap_host": "",
-    "imap_port": "993",
-    "imap_user": "",
-    "imap_password": "",
-    "imap_tls": "true",
-    "imap_folder": "INBOX",
-    "poll_interval_seconds": "60",
-    "use_idle": "false",
-    "trash_folder": "Trash",
     "paperless_url": "",
     "paperless_token": "",
     "ai_enabled": "false",
@@ -27,7 +18,7 @@ DEFAULTS: dict[str, str] = {
     "api_key": "",
 }
 
-MASKED_KEYS = {"imap_password", "paperless_token", "ai_api_key", "api_key"}
+MASKED_KEYS = {"paperless_token", "ai_api_key", "api_key"}
 
 
 def get_setting(session: Session, key: str) -> str:
@@ -52,15 +43,6 @@ def get_all_settings(session: Session) -> SettingsRead:
         return get_setting(session, k)
 
     return SettingsRead(
-        imap_host=g("imap_host"),
-        imap_port=int(g("imap_port")),
-        imap_user=g("imap_user"),
-        imap_password="***" if g("imap_password") else "",
-        imap_tls=g("imap_tls") == "true",
-        imap_folder=g("imap_folder"),
-        poll_interval_seconds=int(g("poll_interval_seconds")),
-        use_idle=g("use_idle") == "true",
-        trash_folder=g("trash_folder"),
         paperless_url=g("paperless_url"),
         paperless_token="***" if g("paperless_token") else "",
         ai_enabled=g("ai_enabled") == "true",

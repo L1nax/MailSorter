@@ -3,17 +3,17 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func, col
 from ..db import get_session
-from ..config import get_setting
 from ..models import AuditLog, AuditStatus
+from ..models.account import MailAccount
 
 router = APIRouter(prefix="/api", tags=["status"])
 
-_worker_ref: object = None
+_manager_ref = None
 
 
-def set_worker(worker) -> None:
-    global _worker_ref
-    _worker_ref = worker
+def set_account_manager(manager) -> None:
+    global _manager_ref
+    _manager_ref = manager
 
 
 @router.get("/status")
@@ -47,13 +47,12 @@ def get_status(session: Session = Depends(get_session)):
     ).all()
     top_rules = [{"name": name, "count": cnt} for name, cnt in top_rules_rows]
 
-    worker_running = bool(_worker_ref and getattr(_worker_ref, "running", False))
-    idle_mode = get_setting(session, "use_idle") == "true"
-    imap_configured = all([
-        get_setting(session, "imap_host"),
-        get_setting(session, "imap_user"),
-        get_setting(session, "imap_password"),
-    ])
+    accounts = session.exec(select(MailAccount).where(MailAccount.enabled == True)).all()
+    worker_running = bool(_manager_ref and _manager_ref.running and _manager_ref._tasks)
+    imap_configured = bool(accounts)
+    idle_mode = any(a.use_idle for a in accounts)
+
+    from ..config import get_setting
     paperless_configured = all([
         get_setting(session, "paperless_url"),
         get_setting(session, "paperless_token"),
@@ -74,17 +73,17 @@ def get_status(session: Session = Depends(get_session)):
 
 @router.post("/worker/start", status_code=204)
 async def start_worker():
-    if _worker_ref:
-        _worker_ref.start()
+    if _manager_ref:
+        _manager_ref.start()
 
 
 @router.post("/worker/stop", status_code=204)
 def stop_worker():
-    if _worker_ref:
-        _worker_ref.stop()
+    if _manager_ref:
+        _manager_ref.stop()
 
 
 @router.post("/worker/process-now", status_code=204)
 async def process_now():
-    if _worker_ref:
-        await _worker_ref.process_once()
+    if _manager_ref:
+        await _manager_ref.process_all_now()

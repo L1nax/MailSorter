@@ -11,14 +11,6 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 _SENTINEL = "***"
 
 
-class ImapTestRequest(BaseModel):
-    imap_host: str = ""
-    imap_port: int = 993
-    imap_user: str = ""
-    imap_password: str = ""
-    imap_tls: bool = True
-
-
 class AiTestRequest(BaseModel):
     ai_provider: str = "claude"
     ai_api_key: str = ""
@@ -41,29 +33,12 @@ def update_settings(body: SettingsUpdate, session: Session = Depends(get_session
     data = body.model_dump(exclude_none=True)
     for key, value in data.items():
         if key in MASKED_KEYS and value == _SENTINEL:
-            continue  # Don't overwrite stored secret with the masked sentinel
+            continue
         if isinstance(value, bool):
             set_setting(session, key, "true" if value else "false")
         else:
             set_setting(session, key, str(value))
     return get_all_settings(session)
-
-
-@router.post("/test-imap")
-async def test_imap(body: ImapTestRequest, session: Session = Depends(get_session)):
-    from ..core.imap_worker import test_imap_connection
-    host = body.imap_host or get_setting(session, "imap_host")
-    port = body.imap_port or int(get_setting(session, "imap_port"))
-    user = body.imap_user or get_setting(session, "imap_user")
-    # If the frontend sends the sentinel, fall back to the stored password
-    password = (
-        get_setting(session, "imap_password")
-        if body.imap_password in (_SENTINEL, "")
-        else body.imap_password
-    )
-    tls = body.imap_tls
-    ok, msg = test_imap_connection(host, port, user, password, tls)
-    return {"ok": ok, "message": msg}
 
 
 @router.post("/test-paperless")
