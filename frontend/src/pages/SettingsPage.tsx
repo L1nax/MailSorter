@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { settingsApi, type Settings } from '@/api/client'
+import { settingsApi, backupApi, type Settings } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +39,13 @@ export default function SettingsPage() {
   const [loadingModels, setLoadingModels] = useState(false)
   const [customModel, setCustomModel] = useState(false)
   const fetchIdRef = useRef(0)
+  const [backupSections, setBackupSections] = useState<string[]>(['rules', 'accounts', 'settings', 'suggestions'])
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<Record<string, number> | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const DEFAULT_MODELS: Record<string, string> = {
     claude: 'claude-sonnet-4-6', openai: 'gpt-4o-mini', gemini: 'gemini-2.0-flash', ollama: 'llama3.2',
@@ -72,6 +79,41 @@ export default function SettingsPage() {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await backupApi.export(backupSections)
+    } catch (e) {
+      console.error('Export fehlgeschlagen:', e)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    setImportResult(null)
+    setImportError(null)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      const counts = await backupApi.import(data, importMode)
+      setImportResult(counts)
+    } catch (err) {
+      setImportError(String(err))
+    } finally {
+      setImporting(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const toggleSection = (s: string) =>
+    setBackupSections(prev =>
+      prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]
+    )
 
   if (!settings) return <div className="text-muted-foreground">Lade Einstellungen…</div>
 
@@ -261,6 +303,94 @@ export default function SettingsPage() {
               />
               <p className="text-xs text-muted-foreground">Standard-Snooze-Dauer für Vorschläge</p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Backup & Restore</CardTitle></CardHeader>
+        <CardContent className="space-y-5">
+          {/* Export */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Export</p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { key: 'rules', label: 'Regeln' },
+                { key: 'accounts', label: 'Mail-Accounts' },
+                { key: 'settings', label: 'Einstellungen' },
+                { key: 'suggestions', label: 'KI-Vorschläge & Signale' },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={backupSections.includes(key)}
+                    onChange={() => toggleSection(key)}
+                    className="rounded"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting || backupSections.length === 0}
+            >
+              {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              Backup herunterladen
+            </Button>
+          </div>
+
+          <div className="h-px bg-border" />
+
+          {/* Import */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Import</p>
+            <div className="flex gap-4">
+              {(['merge', 'replace'] as const).map(m => (
+                <label key={m} className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value={m}
+                    checked={importMode === m}
+                    onChange={() => setImportMode(m)}
+                  />
+                  {m === 'merge' ? 'Merge (bestehende behalten)' : 'Überschreiben'}
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+              >
+                {importing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                Backup-Datei auswählen…
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleImportFile}
+              />
+            </div>
+            {importResult && (
+              <p className="text-sm text-green-600 flex items-center gap-1">
+                <CheckCircle className="h-4 w-4" />
+                Importiert: {Object.entries(importResult).filter(([, v]) => v > 0).map(([k, v]) => `${k}: ${v}`).join(', ') || 'Keine neuen Einträge'}
+              </p>
+            )}
+            {importError && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {importError}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
