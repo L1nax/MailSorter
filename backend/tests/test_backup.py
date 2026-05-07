@@ -155,3 +155,8 @@ class TestImportReplace:
         }
         counts = import_data(session, data, "replace")
         assert "accounts" not in counts
+
+    def test_invalid_mode_raises(self, session):
+        data = {"version": 1, "sections": ["rules"], "rules": []}
+        with pytest.raises(ValueError, match="Ungültiger Modus"):
+            import_data(session, data, "overwrite")

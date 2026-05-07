@@ -9,12 +9,12 @@ from ..models.suggestion import AISignal, RuleSuggestion
 
 
 def _parse_dt(value: str | datetime | None) -> datetime | None:
-    """Konvertiert ISO-String in datetime-Objekt, falls nötig."""
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value
-    return datetime.fromisoformat(value)
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    dt = datetime.fromisoformat(value)
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
 
 ALL_SECTIONS = ("rules", "accounts", "settings", "suggestions")
 
@@ -41,6 +41,8 @@ def export_data(session: Session, sections: list[str]) -> dict[str, Any]:
 
 def import_data(session: Session, data: dict[str, Any], mode: str) -> dict[str, int]:
     counts: dict[str, int] = {}
+    if mode not in ("merge", "replace"):
+        raise ValueError(f"Ungültiger Modus: {mode!r}")
     sections = data.get("sections", [])
     if "rules" in sections:
         counts["rules"] = _import_rules(session, data.get("rules", []), mode)
@@ -65,8 +67,8 @@ def _import_rules(session: Session, items: list[dict], mode: str) -> int:
     for d in items:
         if mode == "merge" and session.get(Rule, d["id"]):
             continue
-        d = {**d, "created_at": _parse_dt(d.get("created_at"))}
-        session.add(Rule(**d))
+        row = {**d, "created_at": _parse_dt(d.get("created_at"))}
+        session.add(Rule(**row))
         count += 1
     return count
 
@@ -80,8 +82,8 @@ def _import_accounts(session: Session, items: list[dict], mode: str) -> int:
     for d in items:
         if mode == "merge" and session.get(MailAccount, d["id"]):
             continue
-        d = {**d, "created_at": _parse_dt(d.get("created_at"))}
-        session.add(MailAccount(**d))
+        row = {**d, "created_at": _parse_dt(d.get("created_at"))}
+        session.add(MailAccount(**row))
         count += 1
     return count
 
@@ -109,12 +111,12 @@ def _import_ai_signals(session: Session, items: list[dict], mode: str) -> int:
     for d in items:
         if mode == "merge" and session.get(AISignal, d["id"]):
             continue
-        d = {
+        row = {
             **d,
             "created_at": _parse_dt(d.get("created_at")),
             "last_seen": _parse_dt(d.get("last_seen")),
         }
-        session.add(AISignal(**d))
+        session.add(AISignal(**row))
         count += 1
     return count
 
@@ -128,12 +130,12 @@ def _import_rule_suggestions(session: Session, items: list[dict], mode: str) -> 
     for d in items:
         if mode == "merge" and session.get(RuleSuggestion, d["id"]):
             continue
-        d = {
+        row = {
             **d,
             "created_at": _parse_dt(d.get("created_at")),
             "snooze_until": _parse_dt(d.get("snooze_until")),
         }
-        session.add(RuleSuggestion(**d))
+        session.add(RuleSuggestion(**row))
         count += 1
     return count
 
