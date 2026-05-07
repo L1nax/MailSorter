@@ -35,6 +35,7 @@ export interface Rule {
   conditions: Condition[]
   action: ActionType
   action_params: Record<string, string | boolean>
+  account_id: string | null
   created_at: string
 }
 
@@ -45,6 +46,7 @@ export interface RuleCreate {
   conditions: Condition[]
   action: ActionType
   action_params: Record<string, string | boolean>
+  account_id?: string | null
 }
 
 export const rulesApi = {
@@ -69,6 +71,8 @@ export interface AuditLog {
   target: string | null
   status: 'success' | 'error'
   error_msg: string | null
+  account_id: string | null
+  account_name: string | null
 }
 
 export interface LogsResponse {
@@ -87,17 +91,8 @@ export const logsApi = {
   purge: (days: number) => request<void>(`/logs?older_than_days=${days}`, { method: 'DELETE' }),
 }
 
-// Settings
+// Settings (ohne IMAP)
 export interface Settings {
-  imap_host: string
-  imap_port: number
-  imap_user: string
-  imap_password: string
-  imap_tls: boolean
-  imap_folder: string
-  poll_interval_seconds: number
-  use_idle: boolean
-  trash_folder: string
   paperless_url: string
   paperless_token: string
   ai_enabled: boolean
@@ -110,24 +105,57 @@ export interface Settings {
   api_key: string
 }
 
-export interface ImapTestParams {
-  imap_host: string
-  imap_port: number
-  imap_user: string
-  imap_password: string
-  imap_tls: boolean
-}
-
 export const settingsApi = {
   get: () => request<Settings>('/settings'),
   update: (data: Partial<Settings>) => request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
-  testImap: (params: ImapTestParams) => request<{ ok: boolean; message: string }>('/settings/test-imap', { method: 'POST', body: JSON.stringify(params) }),
   testPaperless: (params: { paperless_url: string; paperless_token: string }) => request<{ ok: boolean; message: string }>('/settings/test-paperless', { method: 'POST', body: JSON.stringify(params) }),
   testAi: (params: { ai_provider: string; ai_api_key: string; ai_model: string; ai_base_url: string }) => request<{ ok: boolean; message: string }>('/settings/test-ai', { method: 'POST', body: JSON.stringify(params) }),
   listAiModels: (params: { provider: string; api_key?: string; base_url?: string }) => {
     const q = new URLSearchParams({ provider: params.provider, api_key: params.api_key ?? '', base_url: params.base_url ?? '' })
     return request<{ models: string[] }>(`/settings/ai-models?${q}`)
   },
+}
+
+// Mail Accounts
+export interface MailAccount {
+  id: string
+  name: string
+  imap_host: string
+  imap_port: number
+  imap_user: string
+  imap_password: string
+  imap_tls: boolean
+  imap_folder: string
+  trash_folder: string
+  poll_interval_seconds: number
+  use_idle: boolean
+  enabled: boolean
+  created_at: string
+}
+
+export interface MailAccountCreate {
+  name: string
+  imap_host: string
+  imap_port: number
+  imap_user: string
+  imap_password: string
+  imap_tls: boolean
+  imap_folder: string
+  trash_folder: string
+  poll_interval_seconds: number
+  use_idle: boolean
+  enabled: boolean
+}
+
+export const accountsApi = {
+  list: () => request<MailAccount[]>('/accounts'),
+  create: (data: MailAccountCreate) => request<MailAccount>('/accounts', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<MailAccountCreate>) => request<MailAccount>(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/accounts/${id}`, { method: 'DELETE' }),
+  testImap: (params: { imap_host: string; imap_port: number; imap_user: string; imap_password: string; imap_tls: boolean }) =>
+    request<{ ok: boolean; message: string }>('/accounts/test-imap', { method: 'POST', body: JSON.stringify(params) }),
+  testImapById: (id: string) => request<{ ok: boolean; message: string }>(`/accounts/${id}/test-imap`, { method: 'POST' }),
+  processNow: (id: string) => request<void>(`/accounts/${id}/process-now`, { method: 'POST' }),
 }
 
 // Status
