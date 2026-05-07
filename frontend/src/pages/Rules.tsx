@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { rulesApi, settingsApi, type Rule, type RuleCreate, type Condition, type ActionType, type ConditionType } from '@/api/client'
+import { rulesApi, accountsApi, settingsApi, type Rule, type RuleCreate, type Condition, type ActionType, type ConditionType, type MailAccount } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +39,7 @@ const BLANK_RULE: RuleCreate = {
   conditions: [{ type: 'from_domain', value: '' }],
   action: 'move',
   action_params: { folder: '' },
+  account_id: null,
 }
 
 function SortableRuleRow({ rule, onEdit, onDelete, onToggle }: { rule: Rule; onEdit: () => void; onDelete: () => void; onToggle: () => void }) {
@@ -72,7 +73,7 @@ function SortableRuleRow({ rule, onEdit, onDelete, onToggle }: { rule: Rule; onE
   )
 }
 
-function RuleEditor({ initial, onSave, onClose, paperlessOk }: { initial: RuleCreate; onSave: (r: RuleCreate) => void; onClose: () => void; paperlessOk: boolean }) {
+function RuleEditor({ initial, onSave, onClose, paperlessOk, accounts }: { initial: RuleCreate; onSave: (r: RuleCreate) => void; onClose: () => void; paperlessOk: boolean; accounts: MailAccount[] }) {
   const [form, setForm] = useState<RuleCreate>(initial)
   const [testInput, setTestInput] = useState({ from_address: '', subject: '', body: '' })
   const [testResult, setTestResult] = useState<string | null>(null)
@@ -167,6 +168,20 @@ function RuleEditor({ initial, onSave, onClose, paperlessOk }: { initial: RuleCr
             <Label>Als gelesen markieren</Label>
           </div>
 
+          <div className="space-y-1">
+            <Label>Account (optional)</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              value={form.account_id ?? ''}
+              onChange={e => setField('account_id', e.target.value || null)}
+            >
+              <option value="">Alle Accounts (global)</option>
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="border rounded-md p-3 space-y-2">
             <button className="flex items-center gap-2 text-sm font-medium" onClick={() => setShowTest(!showTest)}>
               <FlaskConical className="h-4 w-4" /> Test-Modus
@@ -194,10 +209,12 @@ function RuleEditor({ initial, onSave, onClose, paperlessOk }: { initial: RuleCr
 
 export default function Rules() {
   const [rules, setRules] = useState<Rule[]>([])
+  const [accounts, setAccounts] = useState<MailAccount[]>([])
   const [editing, setEditing] = useState<{ rule?: Rule; open: boolean }>({ open: false })
   const [paperlessOk, setPaperlessOk] = useState(false)
   useEffect(() => {
     settingsApi.get().then(s => setPaperlessOk(!!(s.paperless_url && s.paperless_token)))
+    accountsApi.list().then(setAccounts)
   }, [])
 
   const sensors = useSensors(
@@ -291,10 +308,12 @@ export default function Rules() {
             conditions: editing.rule.conditions,
             action: editing.rule.action,
             action_params: editing.rule.action_params,
+            account_id: editing.rule.account_id,
           } : BLANK_RULE}
           onSave={handleSave}
           onClose={() => setEditing({ open: false })}
           paperlessOk={paperlessOk}
+          accounts={accounts}
         />
       )}
     </div>
