@@ -81,7 +81,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <Label>Passwort</Label>
-            <Input type="password" value={settings.imap_password === '***' ? '' : settings.imap_password} onChange={e => update('imap_password', e.target.value)} placeholder="••••••••" />
+            <Input type="password" value={settings.imap_password} onChange={e => update('imap_password', e.target.value)} placeholder="••••••••" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -128,7 +128,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <Label>API-Token</Label>
-            <Input type="password" value={settings.paperless_token === '***' ? '' : settings.paperless_token} onChange={e => update('paperless_token', e.target.value)} placeholder="••••••••" />
+            <Input type="password" value={settings.paperless_token} onChange={e => update('paperless_token', e.target.value)} placeholder="••••••••" />
           </div>
           <TestButton label="Paperless testen" onTest={() => settingsApi.testPaperless({
             paperless_url: settings.paperless_url,
@@ -148,7 +148,7 @@ export default function SettingsPage() {
             <>
               <div className="space-y-1">
                 <Label>API-Key</Label>
-                <Input type="password" value={settings.ai_api_key === '***' ? '' : settings.ai_api_key} onChange={e => update('ai_api_key', e.target.value)} placeholder="sk-ant-…" />
+                <Input type="password" value={settings.ai_api_key} onChange={e => update('ai_api_key', e.target.value)} placeholder="sk-ant-…" />
               </div>
               <div className="space-y-1">
                 <Label>Modell</Label>
@@ -176,7 +176,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-3">
           <div className="space-y-1">
             <Label>API-Key (optional, schützt die Web-UI)</Label>
-            <Input type="password" value={settings.api_key === '***' ? '' : settings.api_key} onChange={e => update('api_key', e.target.value)} placeholder="Leer = kein Schutz" />
+            <Input type="password" value={settings.api_key} onChange={e => update('api_key', e.target.value)} placeholder="Leer = kein Schutz" />
           </div>
           <div className="space-y-1">
             <Label>Audit-Log Aufbewahrung (Tage)</Label>
