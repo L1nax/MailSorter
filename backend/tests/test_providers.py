@@ -157,3 +157,48 @@ class TestGeminiProvider:
         result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
         assert result.action == ActionType.keep
         assert "not configured" in result.warning
+
+
+from unittest.mock import MagicMock
+from app.core.providers import get_provider, make_provider
+from app.core.providers.claude import ClaudeProvider
+from app.core.providers.openai import OpenAIProvider
+from app.core.providers.gemini import GeminiProvider
+
+
+def _mock_session(settings: dict):
+    """Returns a mock session where get_setting(s, key) returns settings[key] or ''."""
+    from app.config import DEFAULTS
+    session = MagicMock()
+    session.get.side_effect = lambda model, key: (
+        MagicMock(value=settings.get(key, DEFAULTS.get(key, "")))
+        if key in settings or key in DEFAULTS else None
+    )
+    return session
+
+
+class TestFactory:
+    def test_make_provider_claude(self):
+        p = make_provider("claude", "key", "claude-sonnet-4-6", "")
+        assert isinstance(p, ClaudeProvider)
+
+    def test_make_provider_openai(self):
+        p = make_provider("openai", "key", "gpt-4o-mini", "https://api.openai.com/v1")
+        assert isinstance(p, OpenAIProvider)
+
+    def test_make_provider_ollama(self):
+        p = make_provider("ollama", "", "llama3.2", "http://localhost:11434/v1")
+        assert isinstance(p, OpenAIProvider)
+
+    def test_make_provider_gemini(self):
+        p = make_provider("gemini", "key", "gemini-2.0-flash", "")
+        assert isinstance(p, GeminiProvider)
+
+    def test_make_provider_unknown_falls_back_to_claude(self):
+        p = make_provider("unknown", "key", "", "")
+        assert isinstance(p, ClaudeProvider)
+
+    def test_get_provider_reads_from_session(self):
+        session = _mock_session({"ai_provider": "openai", "ai_api_key": "k", "ai_model": "gpt-4o-mini", "ai_base_url": "https://api.openai.com/v1"})
+        p = get_provider(session)
+        assert isinstance(p, OpenAIProvider)
