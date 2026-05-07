@@ -86,3 +86,48 @@ class TestClaudeProvider:
                 result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
         assert result.action == ActionType.keep
         assert result.warning != ""
+
+
+from unittest.mock import AsyncMock
+from app.core.providers.openai import OpenAIProvider
+
+
+class TestOpenAIProvider:
+    def test_known_folder(self):
+        provider = OpenAIProvider(
+            api_key="key", model="gpt-4o-mini",
+            base_url="https://api.openai.com/v1"
+        )
+        mock_resp = MagicMock()
+        mock_resp.choices[0].message.content = "INBOX.Work"
+
+        with patch.object(
+            provider.client.chat.completions, "create",
+            new_callable=AsyncMock, return_value=mock_resp
+        ):
+            result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+
+        assert result.action == ActionType.move
+        assert result.params["folder"] == "INBOX.Work"
+
+    def test_unknown_folder_keeps(self):
+        provider = OpenAIProvider(api_key="key", model="gpt-4o-mini",
+                                   base_url="https://api.openai.com/v1")
+        mock_resp = MagicMock()
+        mock_resp.choices[0].message.content = "INBOX.Unknown"
+
+        with patch.object(
+            provider.client.chat.completions, "create",
+            new_callable=AsyncMock, return_value=mock_resp
+        ):
+            result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+
+        assert result.action == ActionType.keep
+        assert "INBOX.Unknown" in result.warning
+
+    def test_no_api_key_returns_keep(self):
+        provider = OpenAIProvider(api_key="", model="gpt-4o-mini",
+                                   base_url="https://api.openai.com/v1")
+        result = asyncio.run(provider.classify(_mail(), ["INBOX.Work"], "Classify."))
+        assert result.action == ActionType.keep
+        assert "not configured" in result.warning
