@@ -313,9 +313,12 @@ class IMAPWorker:
         # Phase 1: Log-Eintrag schreiben, bevor die Aktion ausgeführt wird
         log_id = self._create_log_entry(mail, rule_id, rule_name, str(action_type))
 
+        mark_as_read: bool = action_params.get("mark_as_read", True)
+
         # Phase 2: Aktion ausführen
         if str(action_type) == "keep":
-            imap.set_flags(mail.uid, [b"\\Seen"])
+            if mark_as_read:
+                imap.set_flags(mail.uid, [b"\\Seen"])
             self._finalize_log_entry(log_id, inbox_folder, AuditStatus.success, ai_warning)
             return
 
@@ -342,7 +345,7 @@ class IMAPWorker:
         # Phase 3: Log-Eintrag finalisieren
         self._finalize_log_entry(log_id, exec_result.target, status, exec_result.error or ai_warning)
 
-        if exec_result.success:
+        if exec_result.success and mark_as_read:
             imap.set_flags(mail.uid, [b"\\Seen"])
 
     @staticmethod

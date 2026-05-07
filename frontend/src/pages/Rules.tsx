@@ -152,6 +152,14 @@ function RuleEditor({ initial, onSave, onClose }: { initial: RuleCreate; onSave:
             )}
           </div>
 
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={form.action_params.mark_as_read !== false}
+              onCheckedChange={v => setField('action_params', { ...form.action_params, mark_as_read: v })}
+            />
+            <Label>Als gelesen markieren</Label>
+          </div>
+
           <div className="border rounded-md p-3 space-y-2">
             <button className="flex items-center gap-2 text-sm font-medium" onClick={() => setShowTest(!showTest)}>
               <FlaskConical className="h-4 w-4" /> Test-Modus

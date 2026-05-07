@@ -34,7 +34,7 @@ export interface Rule {
   enabled: boolean
   conditions: Condition[]
   action: ActionType
-  action_params: Record<string, string>
+  action_params: Record<string, string | boolean>
   created_at: string
 }
 
@@ -44,7 +44,7 @@ export interface RuleCreate {
   enabled: boolean
   conditions: Condition[]
   action: ActionType
-  action_params: Record<string, string>
+  action_params: Record<string, string | boolean>
 }
 
 export const rulesApi = {
