@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, GripVertical, Edit2, X, ChevronDown, ChevronUp, FlaskConical } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Edit2, X, ChevronDown, ChevronUp, FlaskConical, MailOpen, Mail } from 'lucide-react'
 
 const CONDITION_TYPES: { value: ConditionType; label: string }[] = [
   { value: 'from_domain', label: 'Absender-Domain' },
@@ -56,6 +56,11 @@ function SortableRuleRow({ rule, onEdit, onDelete, onToggle }: { rule: Rule; onE
       <td className="px-3 py-3 text-sm text-muted-foreground">{rule.conditions.length} Bedingung{rule.conditions.length !== 1 ? 'en' : ''}</td>
       <td className="px-3 py-3"><Badge variant="secondary">{ACTION_TYPES.find(a => a.value === rule.action)?.label ?? rule.action}</Badge></td>
       <td className="px-3 py-3 text-sm text-muted-foreground truncate max-w-[120px]">{rule.action_params?.folder ?? rule.action_params?.url ?? ''}</td>
+      <td className="px-3 py-3">
+        {rule.action_params?.mark_as_read !== false
+          ? <MailOpen className="h-4 w-4 text-muted-foreground" title="Als gelesen markieren" />
+          : <Mail className="h-4 w-4 text-muted-foreground" title="Ungelesen lassen" />}
+      </td>
       <td className="px-3 py-3"><Switch checked={rule.enabled} onCheckedChange={onToggle} /></td>
       <td className="px-3 py-3">
         <div className="flex gap-1">
@@ -247,13 +252,14 @@ export default function Rules() {
                     <th className="px-3 py-2 text-left font-medium">Bedingungen</th>
                     <th className="px-3 py-2 text-left font-medium">Aktion</th>
                     <th className="px-3 py-2 text-left font-medium">Ziel</th>
+                    <th className="px-3 py-2 text-left font-medium">Gelesen</th>
                     <th className="px-3 py-2 text-left font-medium">Aktiv</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rules.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Keine Regeln. Erstelle deine erste Regel.</td></tr>
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Keine Regeln. Erstelle deine erste Regel.</td></tr>
                   ) : rules.map(r => (
                     <SortableRuleRow
                       key={r.id}
