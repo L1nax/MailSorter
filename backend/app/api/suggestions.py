@@ -2,12 +2,17 @@
 from __future__ import annotations
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlmodel import Session, select, func, or_
 from ..db import get_session
 from ..models.suggestion import RuleSuggestion, RuleSuggestionRead, SuggestionStatus
 from ..models.rule import Rule, ActionType
 
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
+
+
+class SnoozeRequest(BaseModel):
+    days: int = 30
 
 
 def _get_or_404(suggestion_id: str, session: Session) -> RuleSuggestion:
@@ -75,11 +80,11 @@ def accept_suggestion(suggestion_id: str, session: Session = Depends(get_session
 @router.post("/{suggestion_id}/snooze", response_model=RuleSuggestionRead)
 def snooze_suggestion(
     suggestion_id: str,
-    body: dict,
+    body: SnoozeRequest,
     session: Session = Depends(get_session),
 ):
     obj = _get_or_404(suggestion_id, session)
-    days = int(body.get("days", 30))
+    days = body.days
     obj.status = SuggestionStatus.snoozed
     obj.snooze_until = datetime.utcnow() + timedelta(days=days)
     session.add(obj)
