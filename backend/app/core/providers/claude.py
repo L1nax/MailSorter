@@ -39,12 +39,7 @@ class ClaudeProvider(AIProvider):
                     system=prompt,
                     messages=[{"role": "user", "content": user_msg}],
                 )
-                folder = response.content[0].text.strip()
-                if not folder or len(folder) > 100:
-                    return ClassificationResult(ActionType.keep, {}, f"AI returned invalid folder: {folder!r}")
-                if folder not in folders:
-                    log.info("Claude suggested new folder %r", folder)
-                return ClassificationResult(ActionType.move, {"folder": folder})
+                return self._parse_response(response.content[0].text, folders)
             except anthropic.RateLimitError as exc:
                 last_error = exc
                 log.warning("Claude rate limit (attempt %d/%d)", attempt + 1, len(BACKOFF_DELAYS) + 1)

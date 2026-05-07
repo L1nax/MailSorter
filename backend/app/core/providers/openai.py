@@ -33,12 +33,7 @@ class OpenAIProvider(AIProvider):
                     {"role": "user", "content": user_msg},
                 ],
             )
-            folder = response.choices[0].message.content.strip()
-            if not folder or len(folder) > 100:
-                return ClassificationResult(ActionType.keep, {}, f"AI returned invalid folder: {folder!r}")
-            if folder not in folders:
-                log.info("OpenAI suggested new folder %r", folder)
-            return ClassificationResult(ActionType.move, {"folder": folder})
+            return self._parse_response(response.choices[0].message.content, folders)
         except Exception as exc:
             log.exception("OpenAI classifier error")
             return ClassificationResult(ActionType.keep, {}, f"AI failed: {exc}")

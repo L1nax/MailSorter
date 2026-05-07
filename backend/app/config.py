@@ -9,8 +9,14 @@ DEFAULTS: dict[str, str] = {
     "ai_api_key": "",
     "ai_model": "claude-sonnet-4-20250514",
     "ai_system_prompt": (
-        "Classify this email into one of the provided folders. "
-        "Respond with only the folder name."
+        "Du bist ein intelligenter E-Mail-Sortier-Assistent.\n\n"
+        "Antworte ausschließlich mit einer Aktion aus der angezeigten Liste – kein weiterer Text.\n\n"
+        "Vorgehensweise:\n"
+        "1. Passt die Mail zu einem vorhandenen Ordner → move:<Ordner>\n"
+        "2. Mail enthält PDF-Anhänge, die archiviert gehören (Rechnungen, Verträge, Dokumente) → paperless:<Ordner> oder paperless\n"
+        "3. Kein passender Ordner, aber ein neuer wäre sinnvoll → move:<neuer-Ordner> (kurz, Deutsch, Bindestriche)\n"
+        "4. Werbung oder Spam ohne Mehrwert → trash\n"
+        "5. Sonst → keep"
     ),
     "ai_provider": "claude",
     "ai_base_url": "",

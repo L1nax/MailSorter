@@ -33,6 +33,73 @@ def test_build_prompt_contains_mail_fields():
     assert "INBOX.Rechnungen" in prompt
 
 
+def test_build_prompt_shows_paperless_action_for_pdf():
+    from app.core.imap_worker import RawMail
+    mail = RawMail(
+        uid=1, message_id="<t>", from_address="a@b.com",
+        subject="Rechnung", to_address="me@c.com",
+        body="", has_attachment=True, attachment_types=["application/pdf"],
+    )
+    provider = _DummyProvider()
+    prompt = provider._build_prompt(mail, [])
+    assert "paperless" in prompt
+
+
+def test_build_prompt_hides_paperless_without_pdf():
+    from app.core.imap_worker import RawMail
+    mail = RawMail(
+        uid=1, message_id="<t>", from_address="a@b.com",
+        subject="Test", to_address="me@c.com",
+        body="", has_attachment=False, attachment_types=[],
+    )
+    provider = _DummyProvider()
+    prompt = provider._build_prompt(mail, [])
+    assert "paperless" not in prompt
+
+
+class TestParseResponse:
+    def setup_method(self):
+        self.provider = _DummyProvider()
+        self.folders = ["INBOX.Arbeit", "INBOX.Rechnungen"]
+
+    def test_move_prefix(self):
+        r = self.provider._parse_response("move:INBOX.Arbeit", self.folders)
+        assert r.action == ActionType.move
+        assert r.params["folder"] == "INBOX.Arbeit"
+
+    def test_move_new_folder(self):
+        r = self.provider._parse_response("move:INBOX.Neu", self.folders)
+        assert r.action == ActionType.move
+        assert r.params["folder"] == "INBOX.Neu"
+
+    def test_paperless_with_folder(self):
+        r = self.provider._parse_response("paperless:INBOX.Archiv", self.folders)
+        assert r.action == ActionType.paperless
+        assert r.params["folder"] == "INBOX.Archiv"
+
+    def test_paperless_without_folder(self):
+        r = self.provider._parse_response("paperless", self.folders)
+        assert r.action == ActionType.paperless
+        assert r.params == {}
+
+    def test_keep(self):
+        r = self.provider._parse_response("keep", self.folders)
+        assert r.action == ActionType.keep
+
+    def test_trash(self):
+        r = self.provider._parse_response("trash", self.folders)
+        assert r.action == ActionType.trash
+
+    def test_plain_folder_fallback(self):
+        r = self.provider._parse_response("INBOX.Rechnungen", self.folders)
+        assert r.action == ActionType.move
+        assert r.params["folder"] == "INBOX.Rechnungen"
+
+    def test_empty_response_returns_keep(self):
+        r = self.provider._parse_response("", self.folders)
+        assert r.action == ActionType.keep
+
+
 import anthropic
 from unittest.mock import MagicMock, patch
 from app.core.providers.claude import ClaudeProvider
