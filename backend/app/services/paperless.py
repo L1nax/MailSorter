@@ -14,7 +14,7 @@ async def test_paperless_connection(url: str, token: str) -> tuple[bool, str]:
     if not url or not token:
         return False, "Paperless not configured"
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
             r = await client.get(f"{url.rstrip('/')}/api/", headers={"Authorization": f"Token {token}"}, timeout=10)
             r.raise_for_status()
         return True, "Connection successful"
