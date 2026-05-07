@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const fetchIdRef = useRef(0)
   const [backupSections, setBackupSections] = useState<string[]>(['rules', 'accounts', 'settings', 'suggestions'])
   const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<Record<string, number> | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
@@ -82,10 +83,11 @@ export default function SettingsPage() {
 
   const handleExport = async () => {
     setExporting(true)
+    setExportError(null)
     try {
       await backupApi.export(backupSections)
     } catch (e) {
-      console.error('Export fehlgeschlagen:', e)
+      setExportError(String(e))
     } finally {
       setExporting(false)
     }
@@ -340,6 +342,12 @@ export default function SettingsPage() {
               {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
               Backup herunterladen
             </Button>
+            {exportError && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                {exportError}
+              </p>
+            )}
           </div>
 
           <div className="h-px bg-border" />

@@ -22,7 +22,7 @@ ALL_SECTIONS = ("rules", "accounts", "settings", "suggestions")
 def export_data(session: Session, sections: list[str]) -> dict[str, Any]:
     data: dict[str, Any] = {
         "version": 1,
-        "exported_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "sections": sections,
     }
     if "rules" in sections:
