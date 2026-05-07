@@ -2,7 +2,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import Session
 from .db import engine, init_db
 from .core.backup import export_data, import_data, ALL_SECTIONS
@@ -17,7 +17,7 @@ def cmd_export(args: argparse.Namespace) -> None:
     init_db()
     with Session(engine) as session:
         data = export_data(session, sections)
-    output = args.output or f"mailsort-backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+    output = args.output or f"mailsort-backup-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
     with open(output, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, default=str)
     parts: list[str] = []
@@ -44,7 +44,12 @@ def cmd_import(args: argparse.Namespace) -> None:
         sys.exit(1)
     init_db()
     with Session(engine) as session:
-        counts = import_data(session, data, args.mode)
+        try:
+            counts = import_data(session, data, args.mode)
+        except Exception as e:
+            session.rollback()
+            print(f"Fehler beim Import: {e}", file=sys.stderr)
+            sys.exit(1)
     parts = [f"{k}: {v}" for k, v in counts.items() if v > 0]
     print(f"Import ({args.mode}): {', '.join(parts) or 'Keine neuen Einträge'}")
 
