@@ -21,6 +21,8 @@ class SettingsRead(SQLModel):
     ai_base_url: str = ""
     audit_retention_days: int = 90
     api_key: str = ""
+    suggestion_threshold: int = 3
+    suggestion_snooze_days: int = 30
 
 
 class SettingsUpdate(SQLModel):
@@ -34,3 +36,5 @@ class SettingsUpdate(SQLModel):
     ai_base_url: str | None = None
     audit_retention_days: int | None = None
     api_key: str | None = None
+    suggestion_threshold: int | None = None
+    suggestion_snooze_days: int | None = None

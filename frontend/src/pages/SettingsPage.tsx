@@ -227,6 +227,43 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>KI-Regelvorschläge</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 max-w-sm">
+            <div className="space-y-1">
+              <Label htmlFor="suggestion_threshold">Schwellwert (N)</Label>
+              <Input
+                id="suggestion_threshold"
+                type="number"
+                min={1}
+                max={20}
+                value={settings.suggestion_threshold ?? 3}
+                onChange={e => update('suggestion_threshold', parseInt(e.target.value))}
+                className="h-8 w-24"
+              />
+              <p className="text-xs text-muted-foreground">
+                Anzahl gleicher KI-Entscheidungen bis ein Vorschlag erscheint
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="suggestion_snooze_days">Snooze-Dauer (Tage)</Label>
+              <Input
+                id="suggestion_snooze_days"
+                type="number"
+                min={1}
+                value={settings.suggestion_snooze_days ?? 30}
+                onChange={e => update('suggestion_snooze_days', parseInt(e.target.value))}
+                className="h-8 w-24"
+              />
+              <p className="text-xs text-muted-foreground">Standard-Snooze-Dauer für Vorschläge</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

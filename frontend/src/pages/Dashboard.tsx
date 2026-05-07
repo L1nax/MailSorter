@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { statusApi, logsApi, accountsApi, type Status, type AuditLog } from '@/api/client'
+import { useNavigate } from 'react-router-dom'
+import { statusApi, logsApi, accountsApi, suggestionsApi, type Status, type AuditLog } from '@/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -21,12 +22,19 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(false)
   const [multiAccount, setMultiAccount] = useState(false)
+  const [suggestionCount, setSuggestionCount] = useState(0)
+  const navigate = useNavigate()
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const refresh = async () => {
-    const [s, l] = await Promise.all([statusApi.get(), logsApi.list({ page: 1, page_size: 10 })])
+    const [s, l, sc] = await Promise.all([
+      statusApi.get(),
+      logsApi.list({ page: 1, page_size: 10 }),
+      suggestionsApi.count(),
+    ])
     setStatus(s)
     setLogs(l.items)
+    setSuggestionCount(sc.count)
   }
 
   useEffect(() => {
@@ -51,6 +59,15 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
+        {suggestionCount > 0 && (
+          <button
+            onClick={() => navigate('/suggestions')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary hover:bg-primary/20 transition-colors"
+          >
+            <Sparkles className="h-4 w-4" />
+            {suggestionCount} {suggestionCount === 1 ? 'Regelvorschlag' : 'Regelvorschläge'} verfügbar
+          </button>
+        )}
         <div className="flex gap-2">
           {status?.worker_running ? (
             <Button variant="outline" size="sm" onClick={handleStop} disabled={loading}>

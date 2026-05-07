@@ -22,6 +22,8 @@ DEFAULTS: dict[str, str] = {
     "ai_base_url": "",
     "audit_retention_days": "90",
     "api_key": "",
+    "suggestion_threshold": "3",
+    "suggestion_snooze_days": "30",
 }
 
 MASKED_KEYS = {"paperless_token", "ai_api_key", "api_key"}
@@ -59,4 +61,6 @@ def get_all_settings(session: Session) -> SettingsRead:
         ai_base_url=g("ai_base_url"),
         audit_retention_days=int(g("audit_retention_days")),
         api_key="***" if g("api_key") else "",
+        suggestion_threshold=int(g("suggestion_threshold") or "3"),
+        suggestion_snooze_days=int(g("suggestion_snooze_days") or "30"),
     )

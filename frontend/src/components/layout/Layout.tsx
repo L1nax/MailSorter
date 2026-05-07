@@ -1,12 +1,15 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { LayoutDashboard, ListFilter, Settings, ScrollText, Mail, Sun, Moon, Zap, Server } from 'lucide-react'
+import { LayoutDashboard, ListFilter, Settings, ScrollText, Mail, Sun, Moon, Zap, Server, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
+import { suggestionsApi } from '@/api/client'
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/accounts', label: 'Accounts', icon: Server, end: false },
   { to: '/rules', label: 'Regeln', icon: ListFilter, end: false },
+  { to: '/suggestions', label: 'Vorschläge', icon: Sparkles, end: false },
   { to: '/logs', label: 'Audit-Log', icon: ScrollText, end: false },
   { to: '/settings', label: 'Einstellungen', icon: Settings, end: false },
 ]
@@ -15,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/': 'Dashboard',
   '/accounts': 'Mail-Accounts',
   '/rules': 'Regeln',
+  '/suggestions': 'Regelvorschläge',
   '/logs': 'Audit-Log',
   '/settings': 'Einstellungen',
 }
@@ -23,6 +27,15 @@ export default function Layout() {
   const { theme, toggle } = useTheme()
   const location = useLocation()
   const pageTitle = PAGE_TITLES[location.pathname] ?? 'MailSort'
+  const [suggestionCount, setSuggestionCount] = useState(0)
+
+  useEffect(() => {
+    suggestionsApi.count().then(r => setSuggestionCount(r.count)).catch(() => {})
+    const interval = setInterval(() => {
+      suggestionsApi.count().then(r => setSuggestionCount(r.count)).catch(() => {})
+    }, 60_000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -87,6 +100,11 @@ export default function Layout() {
                     strokeWidth={isActive ? 2.4 : 2}
                   />
                   <span className="truncate">{label}</span>
+                  {to === '/suggestions' && suggestionCount > 0 && !isActive && (
+                    <span className="ml-auto bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center shrink-0">
+                      {suggestionCount > 9 ? '9+' : suggestionCount}
+                    </span>
+                  )}
                   {isActive && (
                     <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary-foreground opacity-60 shrink-0" />
                   )}

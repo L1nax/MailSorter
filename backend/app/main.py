@@ -11,6 +11,7 @@ from .core.account_manager import AccountManager
 from .api import rules, logs, settings
 from .api.accounts import router as accounts_router, set_account_manager
 from .api.status import router as status_router, set_account_manager as set_status_manager
+from .api.suggestions import router as suggestions_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
@@ -43,6 +44,7 @@ app.include_router(logs.router)
 app.include_router(settings.router)
 app.include_router(accounts_router)
 app.include_router(status_router)
+app.include_router(suggestions_router)
 
 
 @app.middleware("http")
