@@ -35,7 +35,7 @@ class ClaudeProvider(AIProvider):
                 response = await asyncio.to_thread(
                     self.client.messages.create,
                     model=self.model,
-                    max_tokens=64,
+                    max_tokens=128,
                     system=prompt,
                     messages=[{"role": "user", "content": user_msg}],
                 )
