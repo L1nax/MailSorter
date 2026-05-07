@@ -41,8 +41,11 @@ function AccountForm({
 
   const handleSave = async () => {
     setSaving(true)
-    await onSave(form)
-    setSaving(false)
+    try {
+      await onSave(form)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const runTest = async () => {
@@ -153,8 +156,8 @@ export default function AccountsPage() {
     } else {
       await accountsApi.create(data)
     }
-    setEditing({ open: false })
     await load()
+    setEditing({ open: false })
   }
 
   const handleDelete = async (id: string) => {
