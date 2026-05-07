@@ -9,7 +9,7 @@ import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 type TestState = { loading: boolean; ok?: boolean; message?: string }
 
-function TestButton({ label, onTest }: { label: string; onTest: () => Promise<{ ok: boolean; message: string }> }) {
+function TestButton({ onTest }: { onTest: () => Promise<{ ok: boolean; message: string }> }) {
   const [state, setState] = useState<TestState>({ loading: false })
   const run = async () => {
     setState({ loading: true })
@@ -109,7 +109,7 @@ export default function SettingsPage() {
               <Input type="number" value={settings.poll_interval_seconds} onChange={e => update('poll_interval_seconds', Number(e.target.value))} className="w-32" />
             </div>
           )}
-          <TestButton label="IMAP testen" onTest={settingsApi.testImap} />
+          <TestButton onTest={settingsApi.testImap} />
         </CardContent>
       </Card>
 
@@ -124,7 +124,7 @@ export default function SettingsPage() {
             <Label>API-Token</Label>
             <Input type="password" value={settings.paperless_token === '***' ? '' : settings.paperless_token} onChange={e => update('paperless_token', e.target.value)} placeholder="••••••••" />
           </div>
-          <TestButton label="Paperless testen" onTest={settingsApi.testPaperless} />
+          <TestButton onTest={settingsApi.testPaperless} />
         </CardContent>
       </Card>
 
@@ -153,7 +153,7 @@ export default function SettingsPage() {
                   onChange={e => update('ai_system_prompt', e.target.value)}
                 />
               </div>
-              <TestButton label="API-Key prüfen" onTest={settingsApi.testAi} />
+              <TestButton onTest={settingsApi.testAi} />
             </>
           )}
         </CardContent>

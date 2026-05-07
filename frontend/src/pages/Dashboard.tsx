@@ -93,7 +93,7 @@ export default function Dashboard() {
                   <td className="px-4 py-2">
                     {l.status === 'success'
                       ? <CheckCircle className="h-4 w-4 text-green-500" />
-                      : <AlertCircle className="h-4 w-4 text-red-500" title={l.error_msg ?? ''} />}
+                      : <span title={l.error_msg ?? undefined}><AlertCircle className="h-4 w-4 text-red-500" /></span>}
                   </td>
                 </tr>
               ))}
