@@ -4,48 +4,56 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Light mode – warm stone + electric indigo */
+    --background: 40 18% 96%;
+    --foreground: 222 40% 9%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 40% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --popover-foreground: 222 40% 9%;
+    --primary: 245 74% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 10% 93%;
+    --secondary-foreground: 222 30% 20%;
+    --muted: 240 10% 93%;
+    --muted-foreground: 222 15% 52%;
+    --accent: 245 80% 95%;
+    --accent-foreground: 245 74% 35%;
+    --destructive: 4 84% 57%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 12% 88%;
+    --input: 240 12% 88%;
+    --ring: 245 74% 58%;
+    --radius: 0.75rem;
+    --sidebar-bg: 0 0% 100%;
+    --sidebar-border: 240 12% 91%;
+    --topbar-bg: 40 18% 96%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Dark mode – deep navy + vibrant indigo */
+    --background: 226 35% 6%;
+    --foreground: 218 22% 87%;
+    --card: 226 30% 9%;
+    --card-foreground: 218 22% 87%;
+    --popover: 226 30% 9%;
+    --popover-foreground: 218 22% 87%;
+    --primary: 245 78% 67%;
+    --primary-foreground: 226 35% 6%;
+    --secondary: 226 24% 14%;
+    --secondary-foreground: 218 18% 72%;
+    --muted: 226 24% 13%;
+    --muted-foreground: 218 14% 54%;
+    --accent: 226 24% 14%;
+    --accent-foreground: 218 22% 87%;
+    --destructive: 4 60% 40%;
+    --destructive-foreground: 218 22% 87%;
+    --border: 226 24% 14%;
+    --input: 226 24% 14%;
+    --ring: 245 78% 67%;
+    --sidebar-bg: 226 32% 8%;
+    --sidebar-border: 226 24% 12%;
+    --topbar-bg: 226 35% 6%;
   }
 }
 
@@ -53,7 +61,148 @@
   * {
     @apply border-border;
   }
+
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv01', 'cv02', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Mono elements */
+  .font-mono,
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  /* Smooth theme transitions – only on specific properties to avoid jank */
+  body,
+  aside,
+  header,
+  main,
+  .card-transition {
+    transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Typography scale */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  h1 { font-size: 1.75rem; line-height: 2rem; }
+  h2 { font-size: 1.375rem; line-height: 1.75rem; }
+  h3 { font-size: 1.125rem; line-height: 1.5rem; }
+}
+
+@layer components {
+  /* Sidebar nav active pulse ring */
+  .nav-active-ring {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 2px 8px hsl(var(--primary) / 0.25);
+  }
+
+  /* Glassmorphism topbar */
+  .topbar-glass {
+    background-color: hsl(var(--topbar-bg) / 0.8);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border-bottom: 1px solid hsl(var(--border) / 0.6);
+  }
+
+  /* Card hover lift */
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px hsl(var(--foreground) / 0.06);
+  }
+
+  /* Stat card gradient accent line */
+  .stat-card-accent {
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card-accent::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.3));
+    border-radius: 2px 2px 0 0;
+  }
+
+  /* Logo icon gradient */
+  .logo-icon {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(245 74% 45%));
+    box-shadow: 0 2px 12px hsl(var(--primary) / 0.4);
+  }
+
+  /* Badge dark mode improvements */
+  .dark .badge-success {
+    background-color: hsl(142 60% 18%);
+    color: hsl(142 60% 70%);
+    border-color: hsl(142 60% 25%);
+  }
+  .dark .badge-warning {
+    background-color: hsl(45 60% 18%);
+    color: hsl(45 60% 70%);
+    border-color: hsl(45 60% 25%);
+  }
+
+  /* Theme toggle track */
+  .toggle-track {
+    @apply relative w-9 h-5 rounded-full transition-all duration-300;
+  }
+  .toggle-thumb {
+    @apply absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300;
+  }
+
+  /* Monospace timestamps */
+  .ts {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+  }
+
+  /* Status dot pulse */
+  @keyframes status-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .status-pulse {
+    animation: status-pulse 2.5s ease-in-out infinite;
+  }
+
+  /* Table row hover */
+  table tbody tr {
+    transition: background-color 0.1s ease;
   }
 }
