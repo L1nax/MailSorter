@@ -104,6 +104,8 @@ export interface Settings {
   ai_api_key: string
   ai_model: string
   ai_system_prompt: string
+  ai_provider: string
+  ai_base_url: string
   audit_retention_days: number
   api_key: string
 }
@@ -121,7 +123,7 @@ export const settingsApi = {
   update: (data: Partial<Settings>) => request<Settings>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
   testImap: (params: ImapTestParams) => request<{ ok: boolean; message: string }>('/settings/test-imap', { method: 'POST', body: JSON.stringify(params) }),
   testPaperless: (params: { paperless_url: string; paperless_token: string }) => request<{ ok: boolean; message: string }>('/settings/test-paperless', { method: 'POST', body: JSON.stringify(params) }),
-  testAi: (params: { ai_api_key: string; ai_model: string }) => request<{ ok: boolean; message: string }>('/settings/test-ai', { method: 'POST', body: JSON.stringify(params) }),
+  testAi: (params: { ai_provider: string; ai_api_key: string; ai_model: string; ai_base_url: string }) => request<{ ok: boolean; message: string }>('/settings/test-ai', { method: 'POST', body: JSON.stringify(params) }),
 }
 
 // Status
