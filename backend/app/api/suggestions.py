@@ -1,6 +1,6 @@
 # backend/app/api/suggestions.py
 from __future__ import annotations
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select, func, or_
@@ -57,7 +57,9 @@ def accept_suggestion(suggestion_id: str, session: Session = Depends(get_session
 
     action_type = ActionType(obj.action)
     action_params: dict = {}
-    if obj.target:
+    if action_type == ActionType.move and obj.target:
+        action_params["folder"] = obj.target
+    elif action_type == ActionType.paperless and obj.target:
         action_params["folder"] = obj.target
 
     rule = Rule(
@@ -86,7 +88,7 @@ def snooze_suggestion(
     obj = _get_or_404(suggestion_id, session)
     days = body.days
     obj.status = SuggestionStatus.snoozed
-    obj.snooze_until = datetime.utcnow() + timedelta(days=days)
+    obj.snooze_until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=days)
     session.add(obj)
     session.commit()
     session.refresh(obj)

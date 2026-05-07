@@ -1,7 +1,7 @@
 # backend/app/core/suggestion_service.py
 from __future__ import annotations
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import Session, select
 from ..models.suggestion import AISignal, RuleSuggestion, SuggestionStatus
 from ..config import get_setting
@@ -49,7 +49,7 @@ def _upsert_and_check(
 
     if existing:
         existing.count += 1
-        existing.last_seen = datetime.utcnow()
+        existing.last_seen = datetime.now(timezone.utc).replace(tzinfo=None)
         session.add(existing)
     else:
         existing = AISignal(
@@ -78,7 +78,7 @@ def _maybe_create_suggestion(
     session: Session,
 ) -> None:
     from ..models.rule import Rule
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     rules = session.exec(select(Rule).where(Rule.enabled == True)).all()
     for rule in rules:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 from sqlalchemy import UniqueConstraint
@@ -24,8 +24,8 @@ class AISignal(SQLModel, table=True):
     action: str = Field(default="")
     target: str = Field(default="")
     count: int = Field(default=1)
-    last_seen: datetime = Field(default_factory=datetime.utcnow)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    last_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
     account_id: str | None = Field(default=None, nullable=True)
 
 
@@ -44,7 +44,7 @@ class RuleSuggestion(SQLModel, table=True):
     suggested_rule_name: str = Field(default="")
     status: SuggestionStatus = Field(default=SuggestionStatus.pending, index=True)
     snooze_until: datetime | None = Field(default=None, nullable=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None), index=True)
     account_id: str | None = Field(default=None, nullable=True)
 
 
