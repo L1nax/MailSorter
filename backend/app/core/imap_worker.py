@@ -340,7 +340,16 @@ class IMAPWorker:
                     for r in account_rules
                     if r.action_params and r.action_params.get("folder")
                 ]
-            ai_result = _asyncio.run(_provider.classify(mail, target_folders, ai_prompt))
+                paperless_url = get_setting(s, "paperless_url")
+                paperless_token = get_setting(s, "paperless_token")
+            has_pdf = any("pdf" in t.lower() for t in mail.attachment_types)
+            effective_prompt = ai_prompt
+            if paperless_url and paperless_token and has_pdf:
+                effective_prompt += (
+                    "\n\nPaperless-NGX ist konfiguriert. "
+                    "Nutze paperless:<Ordner> oder paperless für PDF-Anhänge, die archiviert werden sollen."
+                )
+            ai_result = _asyncio.run(_provider.classify(mail, target_folders, effective_prompt))
             rule_name = "AI"
             action_type = ai_result.action
             action_params = ai_result.params
