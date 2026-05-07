@@ -25,6 +25,7 @@ class AISignal(SQLModel, table=True):
     target: str = Field(default="")
     count: int = Field(default=1)
     last_seen: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     account_id: str | None = Field(default=None, nullable=True)
 
 
