@@ -22,7 +22,8 @@ def backup_export(
     sections: str | None = Query(None, description="Kommasepariert: rules,accounts,settings,suggestions"),
     session: Session = Depends(get_session),
 ) -> Response:
-    secs = [s.strip() for s in sections.split(",")] if sections else list(ALL_SECTIONS)
+    secs = [s.strip() for s in sections.split(",") if s.strip()] if sections else list(ALL_SECTIONS)
+    secs = secs or list(ALL_SECTIONS)
     unknown = set(secs) - set(ALL_SECTIONS)
     if unknown:
         raise HTTPException(status_code=400, detail=f"Unbekannte Sektionen: {', '.join(unknown)}")
