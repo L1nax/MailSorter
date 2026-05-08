@@ -203,6 +203,7 @@ export interface RuleSuggestion {
   snooze_until: string | null
   created_at: string
   account_id: string | null
+  account_name: string | null
 }
 
 export const suggestionsApi = {

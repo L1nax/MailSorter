@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { CheckCircle, Clock, XCircle, Sparkles } from 'lucide-react'
+import { CheckCircle, Clock, XCircle, Sparkles, User } from 'lucide-react'
 
 const SIGNAL_TYPE_LABELS: Record<string, string> = {
   from_domain: 'Domain',
@@ -188,6 +188,7 @@ export default function SuggestionsPage() {
                     <th className="text-left px-4 py-3">Wert</th>
                     <th className="text-left px-4 py-3">Aktion</th>
                     <th className="text-left px-4 py-3">Ziel</th>
+                    <th className="text-left px-4 py-3">Account</th>
                     <th className="text-right px-4 py-3">Aktionen</th>
                   </tr>
                 </thead>
@@ -200,6 +201,11 @@ export default function SuggestionsPage() {
                       <td className="px-4 py-3 font-mono text-xs">{s.signal_value}</td>
                       <td className="px-4 py-3">{s.action}</td>
                       <td className="px-4 py-3">{s.target}</td>
+                      <td className="px-4 py-3">
+                        {s.account_name
+                          ? <Badge variant="outline" className="gap-1 font-normal"><User className="h-3 w-3" />{s.account_name}</Badge>
+                          : <span className="text-muted-foreground">–</span>}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <Button size="sm" onClick={() => handleAccept(s)}>
@@ -242,6 +248,7 @@ export default function SuggestionsPage() {
                     <th className="text-left px-4 py-3">Signal</th>
                     <th className="text-left px-4 py-3">Wert</th>
                     <th className="text-left px-4 py-3">Ziel</th>
+                    <th className="text-left px-4 py-3">Account</th>
                     <th className="text-left px-4 py-3">Status</th>
                     <th className="text-left px-4 py-3">Datum</th>
                   </tr>
@@ -252,6 +259,11 @@ export default function SuggestionsPage() {
                       <td className="px-4 py-3">{SIGNAL_TYPE_LABELS[s.signal_type] ?? s.signal_type}</td>
                       <td className="px-4 py-3 font-mono text-xs">{s.signal_value}</td>
                       <td className="px-4 py-3">{s.target}</td>
+                      <td className="px-4 py-3">
+                        {s.account_name
+                          ? <Badge variant="outline" className="gap-1 font-normal"><User className="h-3 w-3" />{s.account_name}</Badge>
+                          : <span className="text-muted-foreground">–</span>}
+                      </td>
                       <td className="px-4 py-3">
                         <Badge variant={s.status === 'accepted' ? 'default' : 'secondary'}>
                           {STATUS_LABELS[s.status] ?? s.status}

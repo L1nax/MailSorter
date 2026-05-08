@@ -7,6 +7,7 @@ from sqlmodel import Session, select, func, or_
 from ..db import get_session
 from ..models.suggestion import RuleSuggestion, RuleSuggestionRead, SuggestionStatus
 from ..models.rule import Rule, ActionType
+from ..models.account import MailAccount
 
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
 
@@ -38,7 +39,20 @@ def list_suggestions(
         query = select(RuleSuggestion).where(
             RuleSuggestion.status == SuggestionStatus.pending
         )
-    return session.exec(query.order_by(RuleSuggestion.created_at.desc())).all()
+    rows = session.exec(query.order_by(RuleSuggestion.created_at.desc())).all()
+
+    account_ids = {r.account_id for r in rows if r.account_id}
+    accounts = {
+        a.id: a.name
+        for a in session.exec(select(MailAccount).where(MailAccount.id.in_(account_ids))).all()
+    } if account_ids else {}
+
+    result = []
+    for r in rows:
+        data = RuleSuggestionRead.model_validate(r)
+        data.account_name = accounts.get(r.account_id) if r.account_id else None
+        result.append(data)
+    return result
 
 
 @router.get("/count")

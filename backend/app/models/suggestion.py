@@ -60,3 +60,4 @@ class RuleSuggestionRead(SQLModel):
     snooze_until: datetime | None
     created_at: datetime
     account_id: str | None
+    account_name: str | None = None
