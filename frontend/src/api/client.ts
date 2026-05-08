@@ -172,6 +172,8 @@ export interface Status {
   idle_mode: boolean
   imap_configured: boolean
   paperless_configured: boolean
+  ai_configured: boolean
+  ai_last_error: string | null
   mails_today: number
   mails_week: number
   ai_count_week: number

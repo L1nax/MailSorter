@@ -74,6 +74,7 @@ class AIProvider(ABC):
             f"Aktion (genau eine): {actions}\n\n"
             f"Vorhandene Ordner:\n{folders_str}\n\n"
             f"From: {mail.from_address}\n"
+            f"To: {mail.to_address}\n"
             f"Subject: {mail.subject}\n"
             f"{attachment_info}\n\n"
             f"{mail.body[:4000]}"

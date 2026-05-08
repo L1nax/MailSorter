@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { logsApi, accountsApi, type AuditLog, type LogsResponse } from '@/api/client'
+import { parseUTC } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -97,7 +98,7 @@ export default function Logs() {
               ) : data.items.map((l: AuditLog) => (
                 <tr key={l.id} className="border-b last:border-0 hover:bg-muted/30" title={l.error_msg ?? undefined}>
                   <td className="px-4 py-2 whitespace-nowrap text-muted-foreground text-xs">
-                    {new Date(l.timestamp).toLocaleString('de')}
+                    {parseUTC(l.timestamp).toLocaleString('de')}
                   </td>
                   <td className="px-4 py-2 max-w-[140px] truncate">{l.from_address}</td>
                   <td className="px-4 py-2 max-w-[200px] truncate">{l.subject}</td>

@@ -168,6 +168,7 @@ export default function AccountsPage() {
   }
 
   const handleToggle = async (account: MailAccount) => {
+    setAccounts(prev => prev.map(a => a.id === account.id ? { ...a, enabled: !a.enabled } : a))
     await accountsApi.update(account.id, { enabled: !account.enabled })
     await load()
   }

@@ -57,12 +57,29 @@ def get_status(session: Session = Depends(get_session)):
         get_setting(session, "paperless_url"),
         get_setting(session, "paperless_token"),
     ])
+    ai_configured = (
+        get_setting(session, "ai_enabled") == "true"
+        and bool(get_setting(session, "ai_api_key"))
+    )
+
+    since_24h = now - timedelta(hours=24)
+    last_ai_error_row = session.exec(
+        select(AuditLog)
+        .where(AuditLog.rule_name == "AI")
+        .where(AuditLog.error_msg != None)
+        .where(AuditLog.timestamp >= since_24h)
+        .order_by(AuditLog.timestamp.desc())
+        .limit(1)
+    ).first()
+    ai_last_error = last_ai_error_row.error_msg if last_ai_error_row else None
 
     return {
         "worker_running": worker_running,
         "idle_mode": idle_mode,
         "imap_configured": imap_configured,
         "paperless_configured": paperless_configured,
+        "ai_configured": ai_configured,
+        "ai_last_error": ai_last_error,
         "mails_today": mails_today,
         "mails_week": mails_week,
         "ai_count_week": ai_count_week,

@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { statusApi, logsApi, accountsApi, suggestionsApi, type Status, type AuditLog } from '@/api/client'
+import { parseUTC } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Play, Square, RefreshCw, Mail, CheckCircle, AlertCircle, Circle, Bot, Sparkles, ListFilter } from 'lucide-react'
+import { Play, Square, RefreshCw, Mail, CheckCircle, AlertCircle, Circle, Bot, Sparkles, ListFilter, TriangleAlert } from 'lucide-react'
 
 const REFRESH_INTERVAL_MS = 30_000
 
-function ConnectionDot({ ok, label }: { ok: boolean; label: string }) {
+function ConnectionDot({ ok, label, warn }: { ok: boolean; label: string; warn?: boolean }) {
+  const color = warn ? 'text-yellow-500' : ok ? 'text-green-500' : 'text-red-400'
   return (
     <div className="flex items-center gap-1.5 text-sm">
-      <Circle className={`h-2.5 w-2.5 fill-current ${ok ? 'text-green-500' : 'text-red-400'}`} />
-      <span className={ok ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
+      <Circle className={`h-2.5 w-2.5 fill-current ${color}`} />
+      <span className={ok && !warn ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
     </div>
   )
 }
@@ -124,6 +126,16 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {status?.ai_last_error && (
+        <div className="flex items-start gap-3 rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-800 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-300">
+          <TriangleAlert className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-medium">KI-Fehler (letzte 24 h): </span>
+            {status.ai_last_error}
+          </div>
+        </div>
+      )}
+
       {/* Connection status + top rules */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
@@ -131,6 +143,7 @@ export default function Dashboard() {
           <CardContent className="flex gap-6">
             <ConnectionDot ok={!!status?.imap_configured} label="IMAP konfiguriert" />
             <ConnectionDot ok={!!status?.paperless_configured} label="Paperless konfiguriert" />
+            <ConnectionDot ok={!!status?.ai_configured} warn={!!status?.ai_last_error} label="KI aktiv" />
           </CardContent>
         </Card>
         <Card>
@@ -173,7 +186,7 @@ export default function Dashboard() {
                 <tr><td colSpan={multiAccount ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">Keine Einträge</td></tr>
               ) : logs.map(l => (
                 <tr key={l.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-2 whitespace-nowrap text-muted-foreground">{new Date(l.timestamp).toLocaleTimeString('de')}</td>
+                  <td className="px-4 py-2 whitespace-nowrap text-muted-foreground">{parseUTC(l.timestamp).toLocaleTimeString('de')}</td>
                   {multiAccount && <td className="px-4 py-2 max-w-[120px] truncate text-muted-foreground">{l.account_name ?? '–'}</td>}
                   <td className="px-4 py-2 max-w-[160px] truncate">{l.from_address}</td>
                   <td className="px-4 py-2 max-w-[200px] truncate">{l.subject}</td>

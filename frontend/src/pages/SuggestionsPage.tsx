@@ -1,6 +1,7 @@
 // frontend/src/pages/SuggestionsPage.tsx
 import { useEffect, useState } from 'react'
 import { suggestionsApi, settingsApi, type RuleSuggestion } from '@/api/client'
+import { parseUTC } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -104,7 +105,7 @@ export default function SuggestionsPage() {
       suggestionsApi.list('dismissed'),
     ])
     setHistory([...acc, ...snz, ...dis].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) => parseUTC(b.created_at).getTime() - parseUTC(a.created_at).getTime()
     ))
   }
 
@@ -257,7 +258,7 @@ export default function SuggestionsPage() {
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {new Date(s.created_at).toLocaleDateString('de-DE')}
+                        {parseUTC(s.created_at).toLocaleDateString('de-DE')}
                       </td>
                     </tr>
                   ))}
