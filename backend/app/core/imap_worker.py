@@ -54,11 +54,19 @@ def _extract_body(msg: email.message.Message) -> str:
     return ""
 
 
+def _decode_header(value: str) -> str:
+    from email.header import decode_header, make_header
+    try:
+        return str(make_header(decode_header(value)))
+    except Exception:
+        return value
+
+
 def _parse_mail(uid: int, raw: bytes) -> RawMail:
     msg = email.message_from_bytes(raw, policy=policy.compat32)
     _, from_addr = parseaddr(msg.get("From", ""))
     _, to_addr = parseaddr(msg.get("To", ""))
-    subject = msg.get("Subject", "")
+    subject = _decode_header(msg.get("Subject", ""))
     message_id = msg.get("Message-ID", "")
     body = _extract_body(msg)
 
@@ -404,20 +412,21 @@ class IMAPWorker:
             action_type = "keep"
             rule_name = rule_name or "no match"
 
+        action_str = action_type.value if hasattr(action_type, "value") else str(action_type)
         log_id = self._create_log_entry(
-            mail, rule_id, rule_name, str(action_type),
+            mail, rule_id, rule_name, action_str,
             self.account.id, self.account.name,
         )
 
         mark_as_read: bool = action_params.get("mark_as_read", False)
 
-        if str(action_type) == "keep":
+        if action_str == "keep":
             if mark_as_read:
                 imap.set_flags(mail.uid, [b"\\Seen"])
             self._finalize_log_entry(log_id, inbox_folder, AuditStatus.success, ai_warning)
             return
 
-        if str(action_type) == "paperless":
+        if action_str == "paperless":
             from ..services.paperless import upload_pdf_sync
             with Session(engine) as s:
                 paperless_url = get_setting(s, "paperless_url")
@@ -429,7 +438,7 @@ class IMAPWorker:
                         self._finalize_log_entry(log_id, filename, AuditStatus.error, err)
                         return
 
-        if str(action_type) == "webhook":
+        if action_str == "webhook":
             from ..services.webhook import fire_webhook_sync
             url = action_params.get("url", "")
             fire_webhook_sync(url, mail)
