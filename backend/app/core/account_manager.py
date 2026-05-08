@@ -60,10 +60,8 @@ class AccountManager:
         log.info("AccountManager: Worker für '%s' (%s) gestartet", account.name, account.id)
 
     async def process_all_now(self) -> None:
-        with Session(engine) as s:
-            accounts = s.exec(select(MailAccount).where(MailAccount.enabled == True)).all()
         await asyncio.gather(
-            *[IMAPWorker(account).process_once() for account in accounts],
+            *[worker.process_once() for worker in self._workers.values()],
             return_exceptions=True,
         )
 

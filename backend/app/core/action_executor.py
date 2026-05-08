@@ -80,12 +80,18 @@ class ActionExecutor:
     def _move(self, uid: int, folder: str) -> None:
         self._ensure_folder(folder)
         caps = self.imap.capabilities()
-        if IMAP_MOVE_CAP in caps:
-            self.imap.move(uid, folder)
-        else:
-            self.imap.copy(uid, folder)
-            self.imap.delete_messages(uid)
-            self.imap.expunge()
+        try:
+            if IMAP_MOVE_CAP in caps:
+                self.imap.move(uid, folder)
+            else:
+                self.imap.copy(uid, folder)
+                self.imap.delete_messages(uid)
+                self.imap.expunge()
+        except Exception as exc:
+            if "EXPUNGEISSUED" in str(exc):
+                log.warning("UID %s already gone on server (EXPUNGEISSUED), skipping move", uid)
+                return
+            raise
 
     def _ensure_folder(self, folder: str) -> None:
         existing = [f.decode() if isinstance(f, bytes) else f for _, _, f in self.imap.list_folders()]
