@@ -209,8 +209,11 @@ export const suggestionsApi = {
     return request<RuleSuggestion[]>(`/suggestions${qs}`)
   },
   count: () => request<{ count: number }>('/suggestions/count'),
-  accept: (id: string) =>
-    request<RuleSuggestion>(`/suggestions/${id}/accept`, { method: 'POST' }),
+  accept: (id: string, overrides?: { name?: string; target?: string }) =>
+    request<RuleSuggestion>(`/suggestions/${id}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(overrides ?? {}),
+    }),
   snooze: (id: string, days: number) =>
     request<RuleSuggestion>(`/suggestions/${id}/snooze`, {
       method: 'POST',

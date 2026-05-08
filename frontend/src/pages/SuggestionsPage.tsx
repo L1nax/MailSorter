@@ -27,22 +27,54 @@ const STATUS_LABELS: Record<string, string> = {
 
 function AcceptModal({ suggestion, onConfirm, onCancel }: {
   suggestion: RuleSuggestion
-  onConfirm: () => void
+  onConfirm: (name: string, target: string) => Promise<void>
   onCancel: () => void
 }) {
+  const [name, setName] = useState(suggestion.suggested_rule_name)
+  const [target, setTarget] = useState(suggestion.target)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      await onConfirm(name, target)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unbekannter Fehler')
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-background border rounded-xl p-6 max-w-md w-full mx-4 space-y-4">
         <h2 className="text-lg font-semibold">Regel erstellen</h2>
-        <p className="text-sm text-muted-foreground">Folgende Regel wird angelegt:</p>
-        <div className="bg-secondary rounded-lg p-3 space-y-1 text-sm">
-          <div><span className="font-medium">Name:</span> {suggestion.suggested_rule_name}</div>
-          <div><span className="font-medium">Bedingung:</span> {SIGNAL_TYPE_LABELS[suggestion.signal_type] ?? suggestion.signal_type} = {suggestion.signal_value}</div>
-          <div><span className="font-medium">Aktion:</span> {suggestion.action}:{suggestion.target}</div>
+        <p className="text-sm text-muted-foreground">Passe die Regel vor dem Speichern an:</p>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="rule-name">Name</Label>
+            <Input id="rule-name" value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>Bedingung</Label>
+            <div className="bg-secondary rounded-lg px-3 py-2 text-sm text-muted-foreground">
+              {SIGNAL_TYPE_LABELS[suggestion.signal_type] ?? suggestion.signal_type} = <span className="font-mono">{suggestion.signal_value}</span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="rule-target">Zielordner ({suggestion.action})</Label>
+            <Input id="rule-target" value={target} onChange={e => setTarget(e.target.value)} />
+          </div>
         </div>
+        {error && (
+          <p className="text-sm text-destructive">Fehler: {error}</p>
+        )}
         <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={onCancel}>Abbrechen</Button>
-          <Button onClick={onConfirm}>Regel erstellen</Button>
+          <Button variant="outline" onClick={onCancel} disabled={loading}>Abbrechen</Button>
+          <Button onClick={handleSubmit} disabled={loading || !name || !target}>
+            {loading ? 'Wird gespeichert…' : 'Regel erstellen'}
+          </Button>
         </div>
       </div>
     </div>
@@ -80,9 +112,9 @@ export default function SuggestionsPage() {
 
   const handleAccept = (s: RuleSuggestion) => setConfirmSuggestion(s)
 
-  const handleConfirmAccept = async () => {
+  const handleConfirmAccept = async (name: string, target: string) => {
     if (!confirmSuggestion) return
-    await suggestionsApi.accept(confirmSuggestion.id)
+    await suggestionsApi.accept(confirmSuggestion.id, { name, target })
     setConfirmSuggestion(null)
     loadData()
   }
@@ -113,6 +145,7 @@ export default function SuggestionsPage() {
           suggestion={confirmSuggestion}
           onConfirm={handleConfirmAccept}
           onCancel={() => setConfirmSuggestion(null)}
+          key={confirmSuggestion.id}
         />
       )}
 
