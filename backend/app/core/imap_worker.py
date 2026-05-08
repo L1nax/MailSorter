@@ -384,7 +384,7 @@ class IMAPWorker:
                 with Session(engine) as _s:
                     _track_signals(
                         ai_result.signals,
-                        str(action_type),
+                        action_type.value,
                         action_params.get("folder", ""),
                         self.account.id,
                         _s,
