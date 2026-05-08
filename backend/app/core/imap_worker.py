@@ -189,6 +189,15 @@ class IMAPWorker:
             return
         log.info("Account '%s': %d ungelesene Mails gefunden", self.account.name, len(uids))
 
+        try:
+            raw_folders = imap.list_folders()
+            imap_folders = [
+                name for flags, _, name in raw_folders
+                if b"\\Noselect" not in flags and name not in ("INBOX", folder)
+            ]
+        except Exception:
+            imap_folders = []
+
         with Session(engine) as session:
             rules = session.exec(
                 select(Rule)
@@ -213,7 +222,7 @@ class IMAPWorker:
                 raw_data = imap.fetch([uid], ["BODY.PEEK[]"])
                 raw_bytes = raw_data[uid][b"BODY[]"]
                 mail = _parse_mail(uid, raw_bytes)
-                self._process_single(mail, rule_engine, executor, imap, ai_enabled, ai_key, ai_model, ai_prompt, folder)
+                self._process_single(mail, rule_engine, executor, imap, ai_enabled, ai_key, ai_model, ai_prompt, folder, imap_folders)
             except Exception:
                 log.exception("Error processing UID %s on account '%s'", uid, self.account.name)
             finally:
@@ -311,6 +320,7 @@ class IMAPWorker:
         ai_model: str,
         ai_prompt: str,
         inbox_folder: str,
+        imap_folders: list[str] | None = None,
     ) -> None:
         mail_data = MailData(
             from_address=mail.from_address,
@@ -343,7 +353,7 @@ class IMAPWorker:
                     .where(Rule.enabled == True)
                     .where(or_(Rule.account_id == None, Rule.account_id == self.account.id))
                 ).all()
-                target_folders = [
+                target_folders = imap_folders if imap_folders else [
                     r.action_params.get("folder", "")
                     for r in account_rules
                     if r.action_params and r.action_params.get("folder")
