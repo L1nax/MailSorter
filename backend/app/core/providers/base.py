@@ -108,8 +108,9 @@ class AIProvider(ABC):
             params = {"folder": folder} if folder else {}
             return ClassificationResult(ActionType.paperless, params, signals=signals)
 
-        if action_line.startswith("move:"):
-            folder = action_line[len("move:"):].strip()
+        if action_line.startswith("move:") or action_line.startswith("create:"):
+            prefix = "move:" if action_line.startswith("move:") else "create:"
+            folder = action_line[len(prefix):].strip()
             if not folder:
                 return ClassificationResult(
                     ActionType.keep, {}, "AI: move ohne Ordner", signals=signals

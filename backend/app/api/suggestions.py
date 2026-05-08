@@ -15,6 +15,11 @@ class SnoozeRequest(BaseModel):
     days: int = 30
 
 
+class AcceptRequest(BaseModel):
+    name: str | None = None
+    target: str | None = None
+
+
 def _get_or_404(suggestion_id: str, session: Session) -> RuleSuggestion:
     obj = session.get(RuleSuggestion, suggestion_id)
     if not obj:
@@ -47,7 +52,11 @@ def count_suggestions(session: Session = Depends(get_session)):
 
 
 @router.post("/{suggestion_id}/accept", response_model=RuleSuggestionRead)
-def accept_suggestion(suggestion_id: str, session: Session = Depends(get_session)):
+def accept_suggestion(
+    suggestion_id: str,
+    body: AcceptRequest = AcceptRequest(),
+    session: Session = Depends(get_session),
+):
     obj = _get_or_404(suggestion_id, session)
     if obj.status != SuggestionStatus.pending:
         raise HTTPException(status_code=400, detail="Suggestion is not pending")
@@ -56,14 +65,15 @@ def accept_suggestion(suggestion_id: str, session: Session = Depends(get_session
     new_priority = (max_priority or 0) + 1
 
     action_type = ActionType(obj.action)
+    effective_target = body.target if body.target is not None else obj.target
     action_params: dict = {}
-    if action_type == ActionType.move and obj.target:
-        action_params["folder"] = obj.target
-    elif action_type == ActionType.paperless and obj.target:
-        action_params["folder"] = obj.target
+    if action_type == ActionType.move and effective_target:
+        action_params["folder"] = effective_target
+    elif action_type == ActionType.paperless and effective_target:
+        action_params["folder"] = effective_target
 
     rule = Rule(
-        name=obj.suggested_rule_name,
+        name=body.name if body.name else obj.suggested_rule_name,
         priority=new_priority,
         enabled=True,
         conditions=obj.suggested_conditions,
