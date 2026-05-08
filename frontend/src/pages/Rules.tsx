@@ -76,7 +76,7 @@ function SortableRuleRow({ rule, onEdit, onDelete, onToggle }: { rule: Rule; onE
   )
 }
 
-function RuleEditor({ initial, onSave, onClose, paperlessOk, accounts }: { initial: RuleCreate; onSave: (r: RuleCreate) => void; onClose: () => void; paperlessOk: boolean; accounts: MailAccount[] }) {
+function RuleEditor({ initial, onSave, onClose, paperlessOk, accounts, saveError }: { initial: RuleCreate; onSave: (r: RuleCreate) => void; onClose: () => void; paperlessOk: boolean; accounts: MailAccount[]; saveError?: string | null }) {
   const [form, setForm] = useState<RuleCreate>(initial)
   const [testInput, setTestInput] = useState({ from_address: '', subject: '', body: '' })
   const [testResult, setTestResult] = useState<string | null>(null)
@@ -201,6 +201,11 @@ function RuleEditor({ initial, onSave, onClose, paperlessOk, accounts }: { initi
             )}
           </div>
         </div>
+        {saveError && (
+          <div className="mx-4 mb-2 rounded-md bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive">
+            {saveError}
+          </div>
+        )}
         <div className="flex justify-end gap-2 p-4 border-t">
           <Button variant="outline" onClick={onClose}>Abbrechen</Button>
           <Button onClick={() => onSave(form)} disabled={!form.name}>Speichern</Button>
@@ -224,6 +229,7 @@ export default function Rules() {
   const [rules, setRules] = useState<Rule[]>([])
   const [accounts, setAccounts] = useState<MailAccount[]>([])
   const [editing, setEditing] = useState<{ rule?: Rule; open: boolean }>({ open: false })
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [paperlessOk, setPaperlessOk] = useState(false)
   const [search, setSearch] = useState('')
   const [filterAction, setFilterAction] = useState<ActionType | 'all'>('all')
@@ -296,13 +302,18 @@ export default function Rules() {
   }
 
   const handleSave = async (form: RuleCreate) => {
-    if (editing.rule) {
-      await rulesApi.update(editing.rule.id, form)
-    } else {
-      await rulesApi.create(form)
+    try {
+      if (editing.rule) {
+        await rulesApi.update(editing.rule.id, form)
+      } else {
+        await rulesApi.create(form)
+      }
+      setSaveError(null)
+      setEditing({ open: false })
+      await load()
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Unbekannter Fehler')
     }
-    setEditing({ open: false })
-    await load()
   }
 
   const handleDelete = async (id: string) => {
@@ -320,7 +331,7 @@ export default function Rules() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Regeln</h1>
-        <Button onClick={() => setEditing({ open: true })}><Plus className="h-4 w-4 mr-1" /> Neue Regel</Button>
+        <Button onClick={() => { setEditing({ open: true }); setSaveError(null) }}><Plus className="h-4 w-4 mr-1" /> Neue Regel</Button>
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
@@ -398,7 +409,7 @@ export default function Rules() {
                     <SortableRuleRow
                       key={r.id}
                       rule={r}
-                      onEdit={() => setEditing({ rule: r, open: true })}
+                      onEdit={() => { setEditing({ rule: r, open: true }); setSaveError(null) }}
                       onDelete={() => handleDelete(r.id)}
                       onToggle={() => handleToggle(r)}
                     />
@@ -422,9 +433,10 @@ export default function Rules() {
             account_id: editing.rule.account_id,
           } : BLANK_RULE}
           onSave={handleSave}
-          onClose={() => setEditing({ open: false })}
+          onClose={() => { setEditing({ open: false }); setSaveError(null) }}
           paperlessOk={paperlessOk}
           accounts={accounts}
+          saveError={saveError}
         />
       )}
     </div>

@@ -12,7 +12,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   })
   if (!res.ok) {
     const text = await res.text()
-    throw new Error(`${res.status}: ${text}`)
+    try {
+      const json = JSON.parse(text)
+      throw new Error(json.detail ?? text)
+    } catch (e) {
+      if (e instanceof SyntaxError) throw new Error(text)
+      throw e
+    }
   }
   if (res.status === 204) return undefined as T
   return res.json()

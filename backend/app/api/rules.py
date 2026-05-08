@@ -15,6 +15,44 @@ def _get_rule_or_404(rule_id: str, session: Session) -> Rule:
     return rule
 
 
+def _normalize_conditions(conditions: list[dict]) -> list[tuple]:
+    return sorted(
+        (c.get("field", ""), c.get("operator", ""), str(c.get("value", "")))
+        for c in conditions
+    )
+
+
+def check_rule_conflict(
+    session: Session,
+    conditions: list[dict],
+    action: str,
+    action_params: dict,
+    account_id: str | None,
+    exclude_id: str | None = None,
+) -> None:
+    """Raises 409 if an existing rule has identical conditions (duplicate or conflict)."""
+    normalized = _normalize_conditions(conditions)
+    if not normalized:
+        return
+    existing = session.exec(select(Rule)).all()
+    for r in existing:
+        if exclude_id and r.id == exclude_id:
+            continue
+        if r.account_id != account_id:
+            continue
+        if _normalize_conditions(r.conditions or []) != normalized:
+            continue
+        if r.action.value == str(action) and r.action_params == action_params:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate rule: identical conditions and action already exist in rule \"{r.name}\".",
+            )
+        raise HTTPException(
+            status_code=409,
+            detail=f"Conflicting rule: same conditions already used in rule \"{r.name}\" with action \"{r.action}\".",
+        )
+
+
 @router.get("", response_model=list[RuleRead])
 def list_rules(session: Session = Depends(get_session)):
     return session.exec(select(Rule).order_by(Rule.priority)).all()
@@ -22,6 +60,13 @@ def list_rules(session: Session = Depends(get_session)):
 
 @router.post("", response_model=RuleRead, status_code=201)
 def create_rule(body: RuleCreate, session: Session = Depends(get_session)):
+    check_rule_conflict(
+        session,
+        body.conditions or [],
+        body.action,
+        body.action_params or {},
+        body.account_id,
+    )
     rule = Rule(**body.model_dump())
     session.add(rule)
     session.commit()
@@ -33,6 +78,11 @@ def create_rule(body: RuleCreate, session: Session = Depends(get_session)):
 def update_rule(rule_id: str, body: RuleUpdate, session: Session = Depends(get_session)):
     rule = _get_rule_or_404(rule_id, session)
     data = body.model_dump(exclude_unset=True)
+    conditions = data.get("conditions", rule.conditions)
+    action = data.get("action", rule.action)
+    action_params = data.get("action_params", rule.action_params)
+    account_id = data.get("account_id", rule.account_id)
+    check_rule_conflict(session, conditions or [], action, action_params or {}, account_id, exclude_id=rule_id)
     for k, v in data.items():
         setattr(rule, k, v)
     session.add(rule)

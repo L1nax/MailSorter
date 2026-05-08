@@ -8,6 +8,7 @@ from ..db import get_session
 from ..models.suggestion import RuleSuggestion, RuleSuggestionRead, SuggestionStatus
 from ..models.rule import Rule, ActionType
 from ..models.account import MailAccount
+from .rules import check_rule_conflict
 
 router = APIRouter(prefix="/api/suggestions", tags=["suggestions"])
 
@@ -88,6 +89,8 @@ def accept_suggestion(
         action_params["folder"] = effective_target
     elif action_type == ActionType.paperless and effective_target:
         action_params["folder"] = effective_target
+
+    check_rule_conflict(session, obj.suggested_conditions, action_type.value, action_params, obj.account_id)
 
     rule = Rule(
         name=body.name if body.name else obj.suggested_rule_name,
