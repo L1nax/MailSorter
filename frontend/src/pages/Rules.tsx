@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -10,7 +10,10 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2, GripVertical, Edit2, X, ChevronDown, ChevronUp, FlaskConical, MailOpen, Mail } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Edit2, X, ChevronDown, ChevronUp, FlaskConical, MailOpen, Mail, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+
+type SortField = 'name' | 'action' | 'target' | 'priority'
+type SortDir = 'asc' | 'desc'
 
 const CONDITION_TYPES: { value: ConditionType; label: string }[] = [
   { value: 'from_domain', label: 'Absender-Domain' },
@@ -207,11 +210,27 @@ function RuleEditor({ initial, onSave, onClose, paperlessOk, accounts }: { initi
   )
 }
 
+function SortHeader({ label, field, sort, onSort }: { label: string; field: SortField; sort: { field: SortField; dir: SortDir } | null; onSort: (f: SortField) => void }) {
+  const active = sort?.field === field
+  return (
+    <button className="flex items-center gap-1 hover:text-foreground transition-colors" onClick={() => onSort(field)}>
+      {label}
+      {active ? (sort.dir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-40" />}
+    </button>
+  )
+}
+
 export default function Rules() {
   const [rules, setRules] = useState<Rule[]>([])
   const [accounts, setAccounts] = useState<MailAccount[]>([])
   const [editing, setEditing] = useState<{ rule?: Rule; open: boolean }>({ open: false })
   const [paperlessOk, setPaperlessOk] = useState(false)
+  const [search, setSearch] = useState('')
+  const [filterAction, setFilterAction] = useState<ActionType | 'all'>('all')
+  const [filterEnabled, setFilterEnabled] = useState<'all' | 'active' | 'inactive'>('all')
+  const [filterAccount, setFilterAccount] = useState<string>('all')
+  const [sort, setSort] = useState<{ field: SortField; dir: SortDir } | null>(null)
+
   useEffect(() => {
     settingsApi.get().then(s => setPaperlessOk(!!(s.paperless_url && s.paperless_token)))
     accountsApi.list().then(setAccounts)
@@ -224,6 +243,47 @@ export default function Rules() {
 
   const load = async () => setRules(await rulesApi.list())
   useEffect(() => { load() }, [])
+
+  const isFiltered = search !== '' || filterAction !== 'all' || filterEnabled !== 'all' || filterAccount !== 'all' || sort !== null
+
+  const displayRules = useMemo(() => {
+    let result = [...rules]
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        r.conditions.some(c => c.value?.toLowerCase().includes(q)) ||
+        (r.action_params?.folder as string | undefined)?.toLowerCase().includes(q)
+      )
+    }
+    if (filterAction !== 'all') result = result.filter(r => r.action === filterAction)
+    if (filterEnabled === 'active') result = result.filter(r => r.enabled)
+    if (filterEnabled === 'inactive') result = result.filter(r => !r.enabled)
+    if (filterAccount !== 'all') result = result.filter(r => filterAccount === 'global' ? r.account_id === null : r.account_id === filterAccount)
+    if (sort) {
+      result.sort((a, b) => {
+        let va = '', vb = ''
+        if (sort.field === 'name') { va = a.name; vb = b.name }
+        else if (sort.field === 'action') { va = a.action; vb = b.action }
+        else if (sort.field === 'target') { va = (a.action_params?.folder as string) ?? ''; vb = (b.action_params?.folder as string) ?? '' }
+        else if (sort.field === 'priority') { va = String(a.priority).padStart(6, '0'); vb = String(b.priority).padStart(6, '0') }
+        return sort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+      })
+    }
+    return result
+  }, [rules, search, filterAction, filterEnabled, filterAccount, sort])
+
+  const handleSort = (field: SortField) => {
+    setSort(prev => prev?.field === field ? (prev.dir === 'asc' ? { field, dir: 'desc' } : null) : { field, dir: 'asc' })
+  }
+
+  const clearFilters = () => {
+    setSearch('')
+    setFilterAction('all')
+    setFilterEnabled('all')
+    setFilterAccount('all')
+    setSort(null)
+  }
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
@@ -263,27 +323,78 @@ export default function Rules() {
         <Button onClick={() => setEditing({ open: true })}><Plus className="h-4 w-4 mr-1" /> Neue Regel</Button>
       </div>
 
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Suchen…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-8 h-9"
+          />
+        </div>
+        <Select value={filterAction} onValueChange={v => setFilterAction(v as ActionType | 'all')}>
+          <SelectTrigger className="h-9 w-40"><SelectValue placeholder="Aktion" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle Aktionen</SelectItem>
+            {ACTION_TYPES.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterEnabled} onValueChange={v => setFilterEnabled(v as 'all' | 'active' | 'inactive')}>
+          <SelectTrigger className="h-9 w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle Status</SelectItem>
+            <SelectItem value="active">Aktiv</SelectItem>
+            <SelectItem value="inactive">Inaktiv</SelectItem>
+          </SelectContent>
+        </Select>
+        {accounts.length > 0 && (
+          <Select value={filterAccount} onValueChange={setFilterAccount}>
+            <SelectTrigger className="h-9 w-40"><SelectValue placeholder="Account" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Accounts</SelectItem>
+              <SelectItem value="global">Global</SelectItem>
+              {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        {isFiltered && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 text-muted-foreground">
+            <X className="h-3.5 w-3.5 mr-1" /> Filter zurücksetzen
+          </Button>
+        )}
+        <span className="text-xs text-muted-foreground ml-auto">{displayRules.length} von {rules.length}</span>
+      </div>
+
       <Card>
         <CardContent className="p-0">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={rules.map(r => r.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext items={displayRules.map(r => r.id)} strategy={verticalListSortingStrategy}>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="w-8 px-2"></th>
-                    <th className="px-3 py-2 text-left font-medium">Name</th>
+                  <tr className="border-b bg-muted/50 text-muted-foreground text-xs">
+                    <th className="w-8 px-2" title={isFiltered ? 'Drag & Drop bei aktiven Filtern deaktiviert' : ''}></th>
+                    <th className="px-3 py-2 text-left font-medium">
+                      <SortHeader label="Name" field="name" sort={sort} onSort={handleSort} />
+                    </th>
                     <th className="px-3 py-2 text-left font-medium">Bedingungen</th>
-                    <th className="px-3 py-2 text-left font-medium">Aktion</th>
-                    <th className="px-3 py-2 text-left font-medium">Ziel</th>
+                    <th className="px-3 py-2 text-left font-medium">
+                      <SortHeader label="Aktion" field="action" sort={sort} onSort={handleSort} />
+                    </th>
+                    <th className="px-3 py-2 text-left font-medium">
+                      <SortHeader label="Ziel" field="target" sort={sort} onSort={handleSort} />
+                    </th>
                     <th className="px-3 py-2 text-left font-medium">Gelesen</th>
                     <th className="px-3 py-2 text-left font-medium">Aktiv</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rules.length === 0 ? (
-                    <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Keine Regeln. Erstelle deine erste Regel.</td></tr>
-                  ) : rules.map(r => (
+                  {displayRules.length === 0 ? (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                      {rules.length === 0 ? 'Keine Regeln. Erstelle deine erste Regel.' : 'Keine Regeln entsprechen den Filterkriterien.'}
+                    </td></tr>
+                  ) : displayRules.map(r => (
                     <SortableRuleRow
                       key={r.id}
                       rule={r}
