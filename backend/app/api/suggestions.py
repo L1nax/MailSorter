@@ -64,7 +64,10 @@ def accept_suggestion(
     max_priority = session.exec(select(func.max(Rule.priority))).one() or 0
     new_priority = (max_priority or 0) + 1
 
-    action_type = ActionType(obj.action)
+    raw_action = obj.action
+    if "." in raw_action:
+        raw_action = raw_action.split(".")[-1]
+    action_type = ActionType(raw_action)
     effective_target = body.target if body.target is not None else obj.target
     action_params: dict = {}
     if action_type == ActionType.move and effective_target:
